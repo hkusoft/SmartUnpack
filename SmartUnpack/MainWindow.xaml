@@ -1,0 +1,72 @@
+﻿<Window x:Class="SmartUnpack.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SmartUnpack"
+        mc:Ignorable="d"
+        Title="Smart Unpack" Height="480" Width="640" Icon="Images/Unpack.ico">
+
+    <Window.Resources>
+        <DataTemplate x:Key="IconListViewItemDataTemplate">
+            <Canvas Width="128" Height="16">
+                <Image Source="{Binding IconResourceId}" Height="16" Width="16" Canvas.Left="0" Canvas.Top="0"/>
+                <TextBlock Text="{Binding Title}" Canvas.Left="20" Canvas.Top="0" Width="180"/>
+            </Canvas>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="54"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ToolBarTray DockPanel.Dock="Top" Height="54">
+            <ToolBar>
+                <Button ToolTip="Unpack Selected">                    
+                        <Image Source="Images/Unpack.png"  Width="48" Height="48"/>
+                </Button>
+                <Button ToolTip="Unpack All">
+                    <Image Source="Images/UnpackAll.png"  Width="48" Height="48"/>
+                </Button>
+            </ToolBar>
+            <ToolBar>
+                <Button ToolTip="Settings">
+                    <Image Source="Images/Gear.png"  Width="48" Height="48"/>
+                </Button>
+
+            </ToolBar>
+        </ToolBarTray>
+
+        <DataGrid x:Name="TaskListView" AutoGenerateColumns="False"  Grid.Row="1"
+                  Drop="TaskListView_Drop" AllowDrop="True" IsReadOnly="True"
+                  VerticalAlignment="Stretch">
+
+            <DataGrid.Columns>
+                
+                <DataGridTemplateColumn Header="Unpack Tasks" MinWidth="150">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}" TextWrapping="WrapWithOverflow" MaxWidth="320" Margin="5, 0" 
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                
+                <DataGridTemplateColumn Header="Sub Tasks">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ListBox ItemsSource="{Binding SubTasks}" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel IsItemsHost="True" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                            </ListBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid> 
+    </Grid>
+</Window>
