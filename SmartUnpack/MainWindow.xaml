@@ -23,7 +23,7 @@
 
         <ToolBarTray DockPanel.Dock="Top" Height="54">
             <ToolBar>
-                <Button ToolTip="Unpack Selected">                    
+                <Button ToolTip="Unpack Selected" Command="{Binding UnpackSelectedCommand}" IsEnabled="{Binding IsSomeTaskSelected}">                    
                         <Image Source="Images/Unpack.png"  Width="48" Height="48"/>
                 </Button>
                 <Button ToolTip="Unpack All">
@@ -40,7 +40,9 @@
 
         <DataGrid x:Name="TaskListView" AutoGenerateColumns="False"  Grid.Row="1"
                   Drop="TaskListView_Drop" AllowDrop="True" IsReadOnly="True"
-                  VerticalAlignment="Stretch">
+                  VerticalAlignment="Stretch"                  
+                  SelectionChanged="OnListViewSelectionChanged" 
+                  >
 
             <DataGrid.Columns>
                 

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SharpCompress.Archives.Rar;
+using SharpCompress.Readers;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -37,8 +39,35 @@ namespace SmartTaskLib
 
         public void Unpack()
         {
+            var firstPart = SubTasks.FirstOrDefault();
+            if(firstPart !=null)
+            {
+                //using (Stream stream = File.OpenRead(firstPart.FilePath))
+                //{
 
+               using (var archive = RarArchive.Open(firstPart.FilePath))
+               {
+                    if(archive.IsMultipartVolume() && archive.IsFirstVolume())
+                    {
+                        //archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
+                        //archive.ExtractAllEntries();
+                        //double totalSize = archive.Entries.Where(e => !e.IsDirectory).Sum(e => e.Size);
+                        //Console.WriteLine(totalSize);
+                        foreach (RarArchiveEntry item in archive.Entries)
+                        {
+                            Console.WriteLine(item.Key);
+                        }
+                        
+                    }
+               }                   
+                
+            }
+
+        void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<SharpCompress.Archives.IArchiveEntry> e)
+        {
+                Console.WriteLine(e.Item);
         }
+    }
 
         internal bool CheckFilesExist()
         {

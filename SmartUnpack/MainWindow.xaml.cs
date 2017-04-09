@@ -20,11 +20,13 @@ namespace SmartUnpack
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, IMainView
     {
+        MainViewModel viewModel;
         public MainWindow()
         {
             InitializeComponent();
+            viewModel = new MainViewModel(this);
         }
 
         private void TaskListView_Drop(object sender, DragEventArgs e)
@@ -41,6 +43,15 @@ namespace SmartUnpack
                 }
 
                 
+            }
+        }
+
+        private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count > 0)
+            {
+                viewModel.IsSomeTaskSelected = true;
+                viewModel.CurrentSelectedTask = e.AddedItems[0] as UnpackTask;
             }
         }
     }
