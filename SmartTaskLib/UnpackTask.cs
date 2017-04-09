@@ -55,7 +55,7 @@ namespace SmartTaskLib
                         //Console.WriteLine(totalSize);
                         foreach (RarArchiveEntry item in archive.Entries)
                         {
-                            Console.WriteLine(item.Key);
+                            Console.WriteLine(item.Key); // The entry name
                         }
                         
                     }
