@@ -38,7 +38,7 @@ namespace SmartUnpack
 
         private void OnUnpackSelected()
         {
-            CurrentSelectedTask?.Unpack();            
+            CurrentSelectedTask?.Unpack();
         }
     }
 }

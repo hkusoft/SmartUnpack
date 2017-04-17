@@ -33,13 +33,29 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
+                List<UnpackTask> tasks = null;                    
+
                 // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 if(files.Length>0)
                 {
-                    var dir = System.IO.Path.GetDirectoryName(files[0]);
-                    var tasks = SmartTaskUtil.ScanDirectory(dir);
+                    //Shift Key pressed
+                    if (((int) e.KeyStates & 4) == 4)
+                    {
+                        var dir = System.IO.Path.GetDirectoryName(files[0]);
+                        tasks = SmartTaskUtil.ScanDirectory(dir);
+                    }
+                    else
+                    {
+                        var filePath = files[0];
+                        tasks = SmartTaskUtil.CreateTaskForFile(filePath);                        
+                    }
+
                     TaskListView.ItemsSource = tasks;
+                    foreach (var task in tasks)
+                    {
+                        task.Unpack();
+                    }
                 }
 
                 

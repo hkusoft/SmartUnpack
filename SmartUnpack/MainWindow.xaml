@@ -15,7 +15,7 @@
             </Canvas>
         </DataTemplate>
     </Window.Resources>
-    <Grid>
+    <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="54"/>
             <RowDefinition Height="*"/>
@@ -40,9 +40,8 @@
 
         <DataGrid x:Name="TaskListView" AutoGenerateColumns="False"  Grid.Row="1"
                   Drop="TaskListView_Drop" AllowDrop="True" IsReadOnly="True"
-                  VerticalAlignment="Stretch"                  
-                  SelectionChanged="OnListViewSelectionChanged" 
-                  >
+                  VerticalAlignment="Stretch"  HorizontalAlignment="Stretch"                
+                  SelectionChanged="OnListViewSelectionChanged">
 
             <DataGrid.Columns>
                 
@@ -55,16 +54,14 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 
-                <DataGridTemplateColumn Header="Sub Tasks">
+                <DataGridTemplateColumn Header="Sub Tasks" MinWidth="300">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <ListBox ItemsSource="{Binding SubTasks}" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                <ListBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel IsItemsHost="True" />
-                                    </ItemsPanelTemplate>
-                                </ListBox.ItemsPanel>
-                            </ListBox>
+                            <StackPanel Orientation="Horizontal">
+                                <ProgressBar Width="100" Value="{Binding Progress}" Margin="2"/>
+                                <TextBlock Text="{Binding CurrentProgressDescription}" TextWrapping="WrapWithOverflow" Margin="5, 0" 
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
