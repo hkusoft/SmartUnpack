@@ -74,8 +74,10 @@ namespace SmartTaskLib
             var unpackTask = new UnpackTask(new List<string>() { filePath});
             bool bExists = unpackTask.CheckFilesExist();
             if (bExists)
-                output.Add(unpackTask);
-
+                output.Add(unpackTask);                                
+            else if(Directory.Exists(filePath))
+                return ScanDirectory(filePath);
+            
             return output;
 
         }

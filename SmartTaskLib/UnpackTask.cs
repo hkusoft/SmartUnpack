@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualBasic.FileIO;
 
 using SharpCompress.Common.Rar;
+using SharpCompress.Archives.SevenZip;
 
 namespace SmartTaskLib
 {
@@ -41,7 +42,9 @@ namespace SmartTaskLib
 
         private string currentProgressDescription;
         private long TotalSizeInByte = 0;
-        private List<string> VolumePaths = new List<string>();
+
+        //Used to keep the source files to be unpacked, e.g. A.r00, .r01 etc, for deletion purposes
+        private List<string> FilePathsToBeUnpacked = new List<string>();
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -84,62 +87,76 @@ namespace SmartTaskLib
                 SubTasks.Add(new UnpackSubTask(path));            
         }
 
+        private bool InternalUnpackImpl()
+        {
+            var firstFile = SubTasks.FirstOrDefault(); //*.rar or *.r01
+            if (firstFile == null)
+                return false;
+
+
+            var targetFolder = Path.GetDirectoryName(firstFile.FilePath);
+            var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
+
+            using (var archive = ArchiveFactory.Open(firstFile.FilePath))
+            {
+                if (archive is RarArchive)
+                {
+                    RarArchive rar = archive as RarArchive;
+                    if (rar.IsMultipartVolume() && !rar.IsFirstVolume())
+                    {
+                        var path = rar.Volumes.FirstOrDefault();
+                        CurrentProgressDescription = "Please Unpack from the 1st volume";
+                        return false;
+                    }
+                }
+                else //Zip or 7z
+                {
+
+                }
+
+                if (!archive.IsComplete)
+                {
+                    CurrentProgressDescription = "Incomplete files: some files are missing.";
+                    return false;
+                }
+                bytesUnpacked = 0;
+                FilePathsToBeUnpacked.Clear();
+
+                archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
+                archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
+                archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
+
+                if (archive.Volumes.Count() == 1) // 7zip or zip files, not multiple volumen rar files
+                    FilePathsToBeUnpacked.Add(firstFile.FilePath);
+
+                //SetupEventHandler(archive);
+
+                bool bShouldExtractHere = CheckSingleSubFolderExists(archive) || archive.Entries.Count() == 1;
+
+                if (!bShouldExtractHere)
+                    targetFolder = Path.Combine(targetFolder, Title);
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (!entry.IsDirectory)
+                    {
+                        entry.WriteToDirectory(targetFolder, options);
+                    }
+                }
+
+                return true;
+            }
+        }
         public void Unpack()
         {
             Task.Run(() =>
             {
-                var firstFile = SubTasks.FirstOrDefault();
-
-                if (firstFile != null)
+                bool bSuccess = InternalUnpackImpl();
+                if (bSuccess)
                 {
-                    var targetFolder = Path.GetDirectoryName(firstFile.FilePath);
-                    var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
-
-                    using (var archive = ArchiveFactory.Open(firstFile.FilePath))
-                    {
-                        if (archive is RarArchive)
-                        {
-                            RarArchive rar = archive as RarArchive;
-                            if (rar.IsMultipartVolume() && !rar.IsFirstVolume())
-                            {
-                                var path = rar.Volumes.FirstOrDefault();
-                                CurrentProgressDescription = "Please Unpack from the 1st volume";
-                                return;
-                            }
-                        }
-
-                        if (!archive.IsComplete)
-                        {
-                            CurrentProgressDescription = "Incomplete files: some files are missing.";
-                            return;
-                        }
-                        bytesUnpacked = 0;
-                        VolumePaths.Clear();
-
-                        archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
-                        archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
-                        archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
-
-
-                        //SetupEventHandler(archive);
-
-                        bool bShouldExtractHere = CheckSingleSubFolderExists(archive) || archive.Entries.Count() == 1;
-
-                        if (!bShouldExtractHere)
-                            targetFolder = Path.Combine(targetFolder, Title);
-
-                        foreach (var entry in archive.Entries)
-                        {
-                            if (!entry.IsDirectory)
-                            {
-                                entry.WriteToDirectory(targetFolder, options);
-                            }                            
-                        }
-
-                    }
-
-                    CleanUp();
-
+                    bSuccess = CleanUp();
+                    if (bSuccess)
+                        CurrentProgressDescription = "All Success";
                 }
             });
     }
@@ -153,8 +170,8 @@ namespace SmartTaskLib
                 if (i != -1)
                     sub = sub.Substring(0, i).Trim();
 
-                if (!VolumePaths.Contains(sub))
-                    VolumePaths.Add(sub);
+                if (!FilePathsToBeUnpacked.Contains(sub))
+                    FilePathsToBeUnpacked.Add(sub);
 
                 //Console.WriteLine(sub);
             }
@@ -173,28 +190,33 @@ namespace SmartTaskLib
             Progress = Convert.ToInt32(bytesUnpacked * 100 / totalSize);
         }
 
-        private void CleanUp()
+        private bool CleanUp()
         {
-            foreach (var item in VolumePaths)
+            bool bSuccess = true;
+            foreach (var item in FilePathsToBeUnpacked)
             {
                 //Console.WriteLine(item);
-                MoveToRecycleBin(item);
+                bSuccess &= MoveToRecycleBin(item);
             }
+            return bSuccess;
         }
 
-        private void MoveToRecycleBin(string filePath)
+        private bool MoveToRecycleBin(string filePath)
         {
+            bool bSuccess = false;
             try
             {
                 var name = Path.GetFileName(filePath);
                 CurrentProgressDescription = $"File clean up: Removing {name}";
                 FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                bSuccess = true;
             }
             catch (Exception ex)
             {
                 CurrentProgressDescription = $"Exception: {ex.Message}";
-            }         
-            
+                return false;
+            }
+            return bSuccess;
         }
 
         private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
@@ -225,12 +247,36 @@ namespace SmartTaskLib
         internal bool CheckSingleSubFolderExists(IArchive archive)
         {
             int nDirectoryItems = 0;
-            foreach (RarArchiveEntry item in archive.Entries)
+            if (archive is RarArchive)
             {
-                if (item.IsDirectory && !item.Key.Contains(@"\"))
-                    nDirectoryItems++;    
+                //For rar files, a directy is considered as an entry
+                foreach (RarArchiveEntry item in archive.Entries)
+                {
+                    //Console.WriteLine(item.Key);
+                    if (item.IsDirectory && !item.Key.Contains(@"\") && !item.Key.Contains(@"/"))
+                        nDirectoryItems++;
+                }
+                return nDirectoryItems == 1;
             }
-            return nDirectoryItems == 1;            
+            else if (archive is SevenZipArchive)
+            {
+                //All elements in the hashsets are unique
+                HashSet<int> firstIndexPositionOfSlash = new HashSet<int>();
+
+                //For 7Zip, all files are considered as file entry, and no directory entry exists
+                // ABC/aaa.txt, ABC/bbb.txt, ABC/DEF/Aaaa
+                // if all entries have root folder of ABC, then single folder exists
+                foreach (var item in archive.Entries)
+                {
+                    int i = item.Key.IndexOf(@"/");
+                    if (i != -1)
+                        firstIndexPositionOfSlash.Add(i);
+                }
+                return firstIndexPositionOfSlash.Count == 1;
+            }
+            else
+                return false;
+                     
         }
     }
 }
