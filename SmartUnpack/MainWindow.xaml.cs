@@ -23,6 +23,7 @@ namespace SmartUnpack
     public partial class MainWindow : Window, IMainView
     {
         MainViewModel viewModel;
+        List<UnpackTask> tasks = null;
         public MainWindow()
         {
             InitializeComponent();
@@ -33,14 +34,14 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                List<UnpackTask> tasks = null;                    
+                tasks = null;                    
 
                 // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 if(files.Length>0)
                 {
-                    //Shift Key pressed
-                    if (((int) e.KeyStates & 4) == 4)
+                    //Shift Key pressed: 4, Ctrl key: 8
+                    if (((int) e.KeyStates & 8) == 8)
                     {
                         var dir = System.IO.Path.GetDirectoryName(files[0]);
                         tasks = SmartTaskUtil.ScanDirectory(dir);
@@ -54,12 +55,32 @@ namespace SmartUnpack
                     TaskListView.ItemsSource = tasks;
                     foreach (var task in tasks)
                     {
+                        task.OnTaskFinished += OnTaskFinished; 
                         task.Unpack();
                     }
                 }
 
                 
             }
+        }
+
+        private void OnTaskFinished(UnpackTask t, bool bSuccessful)
+        {
+            if (tasks.Contains(t))
+            {
+                tasks.Remove(t);
+                Application.Current.Dispatcher.Invoke(new Action(() =>
+                {
+                    TaskListView.ItemsSource = tasks;
+                    TaskListView.Items.Refresh();
+                }));
+                
+            }
+        }
+
+        private void Invoke(Func<object> p)
+        {
+            throw new NotImplementedException();
         }
 
         private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)

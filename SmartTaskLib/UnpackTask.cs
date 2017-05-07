@@ -46,7 +46,12 @@ namespace SmartTaskLib
         //Used to keep the source files to be unpacked, e.g. A.r00, .r01 etc, for deletion purposes
         private List<string> FilePathsToBeUnpacked = new List<string>();
 
+
+        public delegate void TaskFinished(UnpackTask task, bool bSuccessful);
+        public event TaskFinished OnTaskFinished;
         public event PropertyChangedEventHandler PropertyChanged;
+
+        
 
         // Create the OnPropertyChanged method to raise the event
         protected void OnPropertyChanged(string name)
@@ -69,8 +74,6 @@ namespace SmartTaskLib
         }
 
         
-
-
         /// <summary>
         /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
         /// This constructor extracts all SubTasks where each sub task has info about a file involved, the progress, the title etc.
@@ -87,11 +90,12 @@ namespace SmartTaskLib
                 SubTasks.Add(new UnpackSubTask(path));            
         }
 
-        private bool InternalUnpackImpl()
+        private void InternalUnpackImpl()
         {
+            bool bSuccess = false;
             var firstFile = SubTasks.FirstOrDefault(); //*.rar or *.r01
             if (firstFile == null)
-                return false;
+                return;
 
 
             var targetFolder = Path.GetDirectoryName(firstFile.FilePath);
@@ -106,7 +110,7 @@ namespace SmartTaskLib
                     {
                         var path = rar.Volumes.FirstOrDefault();
                         CurrentProgressDescription = "Please Unpack from the 1st volume";
-                        return false;
+                        return;
                     }
                 }
                 else //Zip or 7z
@@ -117,7 +121,7 @@ namespace SmartTaskLib
                 if (!archive.IsComplete)
                 {
                     CurrentProgressDescription = "Incomplete files: some files are missing.";
-                    return false;
+                    return;
                 }
                 bytesUnpacked = 0;
                 FilePathsToBeUnpacked.Clear();
@@ -142,24 +146,39 @@ namespace SmartTaskLib
                     {
                         entry.WriteToDirectory(targetFolder, options);
                     }
-                }
+                }             
+            }
 
-                return true;
+            bSuccess = CleanUp();
+            if (bSuccess)
+            {
+                CurrentProgressDescription = "All Success";
+                OnTaskFinished?.Invoke(this, true);
             }
         }
         public void Unpack()
         {
             Task.Run(() =>
             {
-                bool bSuccess = InternalUnpackImpl();
-                if (bSuccess)
-                {
-                    bSuccess = CleanUp();
-                    if (bSuccess)
-                        CurrentProgressDescription = "All Success";
-                }
+                InternalUnpackImpl();                
             });
     }
+
+        private bool UnpackIsoFile(string isoFileContainerFolder)
+        {
+            var isoFiles = Directory.GetFiles(isoFileContainerFolder, "*.iso");
+            foreach (var path in isoFiles)
+            {
+                FilePathsToBeUnpacked.Add(path);
+                using (var archive = ArchiveFactory.Open(path))
+                {
+
+                }
+            }
+            return true;
+            
+            
+        }
 
         private void Archive_FilePartExtractionBegin(object sender, FilePartExtractionBeginEventArgs e)
         {            
