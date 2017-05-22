@@ -26,6 +26,7 @@ namespace SmartTaskLib
     /// </summary>
     public partial class UnpackTask : INotifyPropertyChanged
     {
+        #region Fields and Properties
         private List<string> FilePaths { get; set; }
 
         //Total byte unpacked so far
@@ -105,13 +106,18 @@ namespace SmartTaskLib
             }
         }
         public string Title { get; set; } //Task Title
-        
 
+        #endregion
+
+        #region Events exposed
+                
         public delegate void TaskFinished(UnpackTask task, bool bSuccessful);
         public event TaskFinished OnTaskFinished;
-        public event PropertyChangedEventHandler PropertyChanged;
         
+        #endregion
+
         // Create the OnPropertyChanged method to raise the event
+        public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string name)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -131,8 +137,18 @@ namespace SmartTaskLib
             FilePaths = paths;       
         }
 
+       
+       
+        public void Unpack()
+        {
+            Task.Run(() =>
+            {
+                InternalUnpackImpl();                
+            });
+    }
+
         private void InternalUnpackImpl()
-        {            
+        {
             var firstFile = FilePaths.FirstOrDefault(); //*.rar or *.r01
             if (firstFile == null)
                 return;
@@ -150,6 +166,7 @@ namespace SmartTaskLib
                     {
                         var path = rar.Volumes.FirstOrDefault();
                         CurrentProgressDescription = "Please Unpack from the 1st volume";
+                        OnTaskFinished?.Invoke(this, false);
                         return;
                     }
                 }
@@ -161,17 +178,16 @@ namespace SmartTaskLib
                 if (!archive.IsComplete)
                 {
                     CurrentProgressDescription = "Incomplete files: some files are missing.";
+                    OnTaskFinished?.Invoke(this, false);
                     return;
                 }
-                bytesUnpacked = 0;
-
-                //archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
+                bytesUnpacked = 0;                
 
                 archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
                 archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
-                
+
                 archive.CompressedBytesRead += Archive_CompressedBytesRead;
-                                
+
                 bool bShouldExtractHere = CheckSingleSubFolderExists(archive) || archive.Entries.Count() == 1;
 
                 if (!bShouldExtractHere)
@@ -183,26 +199,16 @@ namespace SmartTaskLib
                     {
                         entry.WriteToDirectory(targetFolder, options);
                     }
-                }             
+                }
             }
 
-            
+
             if (SingleFileUnpackProgress == 100)
             {
-                CleanUp();
-                CurrentProgressDescription = "All Success";
+                CleanUp();                
                 OnTaskFinished?.Invoke(this, true);
             }
         }
-
-       
-        public void Unpack()
-        {
-            Task.Run(() =>
-            {
-                InternalUnpackImpl();                
-            });
-    }
 
         private bool UnpackIsoFile(string isoFileContainerFolder)
         {
