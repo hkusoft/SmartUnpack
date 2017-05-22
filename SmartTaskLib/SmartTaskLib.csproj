@@ -48,7 +48,6 @@
     <Compile Include="StringUtil.cs" />
     <Compile Include="UnpackTask.cs" />
     <Compile Include="SmartTaskUtil.cs" />
-    <Compile Include="UnpackSubTask.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

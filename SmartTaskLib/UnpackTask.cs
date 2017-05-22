@@ -19,23 +19,24 @@ namespace SmartTaskLib
     /// <summary>
     /// Each UnpackTask has a collection of SubTasks, where each SubTask has its own file path involved and unpacking progress etc.
     /// UnpackTask
-    ///     |__ABC.part01.rar (SubTask)
-    ///     |__ABC.part02.rar (SubTask)
+    ///     |__ABC.part01.rar (FilePath 1)
+    ///     |__ABC.part02.rar (FilePath 2)
     ///     ...    
-    ///     |__ABC.part0N.rar (SubTask)
+    ///     |__ABC.part0N.rar (FilePath N)
     /// </summary>
     public partial class UnpackTask : INotifyPropertyChanged
     {
-        public List<UnpackSubTask> SubTasks { get; set; }
-        public string Title { get; set; } //Task Title
+        private List<string> FilePaths { get; set; }
 
-        int single_file_unpack_progress = 0;
-        int overall_progress;
-
-        long bytesUnpacked = 0;
-        long currentEntrySize = 0;
+        //Total byte unpacked so far
+        long bytesUnpacked = 0;     
         
-
+        //The active file under unpacking, its size is updated when a new entry beings unpacked
+        long currentEntrySize = 0;              
+        
+        #region Single File Unpack Progress
+        //When unpacking a single file, the progress value
+        int single_file_unpack_progress = 0;    
         /// <summary>
         /// The progress when unpacking a single file, this is useful when
         /// one of the entry file is very large
@@ -48,8 +49,12 @@ namespace SmartTaskLib
                 OnPropertyChanged("SingleFileUnpackProgress");                                
             }
         }
+        #endregion
 
+        #region Overall File Unpack Progress
 
+        //When unpacking multiple volume files, the overall progress 
+        int overall_progress;                   
         /// <summary>
         /// The progress when unpacking a single file, this is useful when
         /// one of the entry file is very large
@@ -63,39 +68,14 @@ namespace SmartTaskLib
                 OnPropertyChanged("OverallProgress");
             }
         }
+        #endregion
 
+        #region Current Progress Description
 
-
-        //Used to check if a task is already in a list of unpacking tasks
-        public string Hash 
-        {
-            get
-            {
-                var str= SubTasks.Select(item => item.FilePath).Aggregate((a, b) => a + b); // Concatentate all paths of files involved
-                return StringUtil.Hash(str);
-            }
-        }
-
+        /// <summary>
+        /// The string to be displayed when unpacking a file
+        /// </summary>
         private string currentProgressDescription;
-        private long TotalSizeInByte = 0;
-
-        //Used to keep the source files to be unpacked, e.g. A.r00, .r01 etc, for deletion purposes
-        private List<string> FilePathsToBeUnpacked = new List<string>();
-
-
-        public delegate void TaskFinished(UnpackTask task, bool bSuccessful);
-        public event TaskFinished OnTaskFinished;
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        
-
-        // Create the OnPropertyChanged method to raise the event
-        protected void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
-
-
         public string CurrentProgressDescription
         {
             get
@@ -109,6 +89,35 @@ namespace SmartTaskLib
             }
         }
 
+        #endregion
+
+
+        /// <summary>
+        /// Used to check if a task is already in a list of unpacking tasks
+        /// The hash is defined as the SHA1 of the concatenated string of all file paths
+        /// </summary>
+        public string Hash 
+        {
+            get
+            {
+                var str= FilePaths.Aggregate((a, b) => a + b); // Concatentate all paths of files involved
+                return StringUtil.Hash(str);
+            }
+        }
+        public string Title { get; set; } //Task Title
+        
+
+        public delegate void TaskFinished(UnpackTask task, bool bSuccessful);
+        public event TaskFinished OnTaskFinished;
+        public event PropertyChangedEventHandler PropertyChanged;
+        
+        // Create the OnPropertyChanged method to raise the event
+        protected void OnPropertyChanged(string name)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+               
+
         
         /// <summary>
         /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
@@ -117,26 +126,22 @@ namespace SmartTaskLib
         /// <param name="paths"> A list of files that are involved in this unpacking task</param>
         public UnpackTask(List<string> paths)
         {
-            SubTasks = new List<UnpackSubTask>();
-
-            Title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
-            Title =  StringUtil.GetDotLeftString(Title);
-            
-            foreach (var path in paths)            
-                SubTasks.Add(new UnpackSubTask(path));            
+            var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
+            Title =  StringUtil.GetDotLeftString(title);
+            FilePaths = paths;       
         }
 
         private void InternalUnpackImpl()
         {            
-            var firstFile = SubTasks.FirstOrDefault(); //*.rar or *.r01
+            var firstFile = FilePaths.FirstOrDefault(); //*.rar or *.r01
             if (firstFile == null)
                 return;
 
 
-            var targetFolder = Path.GetDirectoryName(firstFile.FilePath);
+            var targetFolder = Path.GetDirectoryName(firstFile);
             var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
 
-            using (var archive = ArchiveFactory.Open(firstFile.FilePath))
+            using (var archive = ArchiveFactory.Open(firstFile))
             {
                 if (archive is RarArchive)
                 {
@@ -159,18 +164,14 @@ namespace SmartTaskLib
                     return;
                 }
                 bytesUnpacked = 0;
-                FilePathsToBeUnpacked.Clear();
+
+                //archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
 
                 archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
                 archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
-                archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
+                
                 archive.CompressedBytesRead += Archive_CompressedBytesRead;
-
-                if (archive.Volumes.Count() == 1) // 7zip or zip files, not multiple volumen rar files
-                    FilePathsToBeUnpacked.Add(firstFile.FilePath);
-
-                //SetupEventHandler(archive);
-
+                                
                 bool bShouldExtractHere = CheckSingleSubFolderExists(archive) || archive.Entries.Count() == 1;
 
                 if (!bShouldExtractHere)
@@ -208,47 +209,22 @@ namespace SmartTaskLib
             var isoFiles = Directory.GetFiles(isoFileContainerFolder, "*.iso");
             foreach (var path in isoFiles)
             {
-                FilePathsToBeUnpacked.Add(path);
+                //FilePathsToBeUnpacked.Add(path);
                 using (var archive = ArchiveFactory.Open(path))
                 {
 
                 }
             }
             return true;
-            
-            
         }
 
-        
-        private void Archive_FilePartExtractionBegin(object sender, FilePartExtractionBeginEventArgs e)
-        {            
-            if(e.Name.StartsWith("Rar File: "))
-            {
-                var sub = e.Name.Substring("Rar File: ".Length);
-                int i = sub.IndexOf("File Entry:");
-                if (i != -1)
-                    sub = sub.Substring(0, i).Trim();
 
-                if (!FilePathsToBeUnpacked.Contains(sub))
-                    FilePathsToBeUnpacked.Add(sub);
-
-                CurrentProgressDescription = $"--> Extracting {Path.GetFileName(e.Name)}";
-
-                
-                //Console.WriteLine(sub);
-            }          
-        }
-
-        
-
+        #region Unpacking event handlers, progress updates
         private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
         {
             var extractedFile = Path.GetFileName(e.Item.Key);
-
             currentEntrySize = e.Item.Size;
-
             CurrentProgressDescription = $"--> Extracting {extractedFile}";
-
         }
 
         private void Archive_EntryExtractionEnd(object sender, ArchiveExtractionEventArgs<IArchiveEntry> e)
@@ -262,25 +238,22 @@ namespace SmartTaskLib
         private void Archive_CompressedBytesRead(object sender, CompressedBytesReadEventArgs e)
         {
             IArchive archive = sender as IArchive;
-            //long totalSize = archive.TotalUncompressSize;
-            //bytesUnpacked += e.CompressedBytesRead;
-
+            
             if(currentEntrySize !=0)
                 SingleFileUnpackProgress = Convert.ToInt32(e.CompressedBytesRead * 100 / currentEntrySize);
 
         }
 
+        #endregion
+
+        #region Utility Functions
 
         private void CleanUp()
         {            
-            foreach (var item in FilePathsToBeUnpacked)
-            {
-                //Console.WriteLine(item);
-                DeleteFile(item);
-            }
-         
+            foreach (var item in FilePaths)
+                DeleteFile(item);            
         }
-
+        
         /// <summary>
         /// 
         /// </summary>
@@ -310,14 +283,11 @@ namespace SmartTaskLib
             return bSuccess;
         }
 
-       
-
         internal bool CheckFilesExist()
         {
-            foreach (var sub in SubTasks)
-                if (!sub.FileExists())
+            foreach (var path in FilePaths)
+                if (!File.Exists(path))
                     return false;
-
             return true;
         }
 
@@ -364,5 +334,7 @@ namespace SmartTaskLib
                 return false;
                      
         }
+
+        #endregion
     }
 }
