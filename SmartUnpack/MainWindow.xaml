@@ -58,7 +58,8 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
-                                <ProgressBar Width="100" Value="{Binding Progress}" Margin="2"/>
+                                <ProgressBar Width="100" Value="{Binding OverallProgress}" Margin="2"/>
+                                <ProgressBar Width="100" Value="{Binding SingleFileUnpackProgress}" Margin="2"/>
                                 <TextBlock Text="{Binding CurrentProgressDescription}" TextWrapping="WrapWithOverflow" Margin="5, 0" 
                                       HorizontalAlignment="Left" VerticalAlignment="Center"/>
                             </StackPanel>

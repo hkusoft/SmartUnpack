@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Collections.Generic;
 
 namespace SmartUnpack
 {
@@ -23,7 +24,7 @@ namespace SmartUnpack
     public partial class MainWindow : Window, IMainView
     {
         MainViewModel viewModel;
-        List<UnpackTask> tasks = null;
+        Dictionary<string, UnpackTask> AllTasks = new  Dictionary<string, UnpackTask>();
         public MainWindow()
         {
             InitializeComponent();
@@ -34,9 +35,9 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                tasks = null;                    
+                Dictionary<string, UnpackTask> tasks = null;
 
-                // Note that you can have more than one file.
+                  // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 if(files.Length>0)
                 {
@@ -44,7 +45,7 @@ namespace SmartUnpack
                     if (((int) e.KeyStates & 8) == 8)
                     {
                         var dir = System.IO.Path.GetDirectoryName(files[0]);
-                        tasks = SmartTaskUtil.ScanDirectory(dir);
+                        tasks = SmartTaskUtil.ScanDirectory(dir);                        
                     }
                     else
                     {
@@ -52,27 +53,39 @@ namespace SmartUnpack
                         tasks = SmartTaskUtil.CreateTaskForFile(filePath);                        
                     }
 
-                    TaskListView.ItemsSource = tasks;
                     foreach (var task in tasks)
                     {
-                        task.OnTaskFinished += OnTaskFinished; 
-                        task.Unpack();
+                        if (!AllTasks.ContainsKey(task.Key))
+                        {
+                            var item = task.Value;
+                            AllTasks[task.Key] = item;
+
+                            item.OnTaskFinished += OnTaskFinished;
+                            item.Unpack();
+                        }
                     }
+
+                    RefreshDataSource();
                 }
 
                 
             }
         }
 
+        private void RefreshDataSource()
+        {
+            TaskListView.ItemsSource = AllTasks.Values;
+            TaskListView.Items.Refresh();
+        }
+
         private void OnTaskFinished(UnpackTask t, bool bSuccessful)
         {
-            if (tasks.Contains(t))
+            if (AllTasks.ContainsKey(t.Hash))
             {
-                tasks.Remove(t);
+                AllTasks.Remove(t.Hash);
                 Application.Current.Dispatcher.Invoke(new Action(() =>
                 {
-                    TaskListView.ItemsSource = tasks;
-                    TaskListView.Items.Refresh();
+                    RefreshDataSource();
                 }));
                 
             }

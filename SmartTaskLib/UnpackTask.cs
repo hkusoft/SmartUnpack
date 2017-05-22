@@ -29,14 +29,50 @@ namespace SmartTaskLib
         public List<UnpackSubTask> SubTasks { get; set; }
         public string Title { get; set; } //Task Title
 
-        int progress = 0;
+        int single_file_unpack_progress = 0;
+        int overall_progress;
+
         long bytesUnpacked = 0;
-        public int Progress
+        long currentEntrySize = 0;
+        
+
+        /// <summary>
+        /// The progress when unpacking a single file, this is useful when
+        /// one of the entry file is very large
+        /// </summary>
+        public int SingleFileUnpackProgress
         {
-            get { return progress; }
+            get { return single_file_unpack_progress; }
             set {
-                progress = value;
-                OnPropertyChanged("Progress");
+                single_file_unpack_progress = value;
+                OnPropertyChanged("SingleFileUnpackProgress");                                
+            }
+        }
+
+
+        /// <summary>
+        /// The progress when unpacking a single file, this is useful when
+        /// one of the entry file is very large
+        /// </summary>
+        public int OverallProgress
+        {
+            get { return overall_progress; }
+            set
+            {
+                overall_progress = value;
+                OnPropertyChanged("OverallProgress");
+            }
+        }
+
+
+
+        //Used to check if a task is already in a list of unpacking tasks
+        public string Hash 
+        {
+            get
+            {
+                var str= SubTasks.Select(item => item.FilePath).Aggregate((a, b) => a + b); // Concatentate all paths of files involved
+                return StringUtil.Hash(str);
             }
         }
 
@@ -91,8 +127,7 @@ namespace SmartTaskLib
         }
 
         private void InternalUnpackImpl()
-        {
-            bool bSuccess = false;
+        {            
             var firstFile = SubTasks.FirstOrDefault(); //*.rar or *.r01
             if (firstFile == null)
                 return;
@@ -129,6 +164,7 @@ namespace SmartTaskLib
                 archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
                 archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
                 archive.FilePartExtractionBegin += Archive_FilePartExtractionBegin;
+                archive.CompressedBytesRead += Archive_CompressedBytesRead;
 
                 if (archive.Volumes.Count() == 1) // 7zip or zip files, not multiple volumen rar files
                     FilePathsToBeUnpacked.Add(firstFile.FilePath);
@@ -149,13 +185,16 @@ namespace SmartTaskLib
                 }             
             }
 
-            bSuccess = CleanUp();
-            if (bSuccess)
+            
+            if (SingleFileUnpackProgress == 100)
             {
+                CleanUp();
                 CurrentProgressDescription = "All Success";
                 OnTaskFinished?.Invoke(this, true);
             }
         }
+
+       
         public void Unpack()
         {
             Task.Run(() =>
@@ -180,6 +219,7 @@ namespace SmartTaskLib
             
         }
 
+        
         private void Archive_FilePartExtractionBegin(object sender, FilePartExtractionBeginEventArgs e)
         {            
             if(e.Name.StartsWith("Rar File: "))
@@ -192,42 +232,74 @@ namespace SmartTaskLib
                 if (!FilePathsToBeUnpacked.Contains(sub))
                     FilePathsToBeUnpacked.Add(sub);
 
-                //Console.WriteLine(sub);
-            }
+                CurrentProgressDescription = $"--> Extracting {Path.GetFileName(e.Name)}";
 
-          
+                
+                //Console.WriteLine(sub);
+            }          
+        }
+
+        
+
+        private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
+        {
+            var extractedFile = Path.GetFileName(e.Item.Key);
+
+            currentEntrySize = e.Item.Size;
+
+            CurrentProgressDescription = $"--> Extracting {extractedFile}";
+
         }
 
         private void Archive_EntryExtractionEnd(object sender, ArchiveExtractionEventArgs<IArchiveEntry> e)
         {
-            CurrentProgressDescription = "Done";
-
             IArchive archive = sender as IArchive;
             long totalSize = archive.TotalUncompressSize;
             bytesUnpacked += e.Item.Size;
-
-            Progress = Convert.ToInt32(bytesUnpacked * 100 / totalSize);
+            OverallProgress = Convert.ToInt32(bytesUnpacked * 100 / totalSize);
         }
 
-        private bool CleanUp()
+        private void Archive_CompressedBytesRead(object sender, CompressedBytesReadEventArgs e)
         {
-            bool bSuccess = true;
+            IArchive archive = sender as IArchive;
+            //long totalSize = archive.TotalUncompressSize;
+            //bytesUnpacked += e.CompressedBytesRead;
+
+            if(currentEntrySize !=0)
+                SingleFileUnpackProgress = Convert.ToInt32(e.CompressedBytesRead * 100 / currentEntrySize);
+
+        }
+
+
+        private void CleanUp()
+        {            
             foreach (var item in FilePathsToBeUnpacked)
             {
                 //Console.WriteLine(item);
-                bSuccess &= MoveToRecycleBin(item);
+                DeleteFile(item);
             }
-            return bSuccess;
+         
         }
 
-        private bool MoveToRecycleBin(string filePath)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="bMove2RecyclerBin">By default, directly remove the file.</param>
+        /// <returns></returns>
+        private bool DeleteFile(string filePath, bool bMove2RecyclerBin=false)
         {
             bool bSuccess = false;
             try
             {
                 var name = Path.GetFileName(filePath);
                 CurrentProgressDescription = $"File clean up: Removing {name}";
-                FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+
+                if (bMove2RecyclerBin)
+                    FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                else
+                    File.Delete(filePath);
+
                 bSuccess = true;
             }
             catch (Exception ex)
@@ -238,12 +310,7 @@ namespace SmartTaskLib
             return bSuccess;
         }
 
-        private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
-        {
-            var extractedFile = Path.GetFileName(e.Item.Key);
-            CurrentProgressDescription = $"--> Extracting {extractedFile}";
-            
-        }
+       
 
         internal bool CheckFilesExist()
         {

@@ -15,9 +15,9 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="inputFolderPath"></param>
         /// <returns></returns>
-        public static List<UnpackTask> ScanDirectory(string inputFolderPath)
+        public static Dictionary<string, UnpackTask> ScanDirectory(string inputFolderPath)
         {
-            var output = new List<UnpackTask>();
+            var output = new Dictionary<string, UnpackTask>();
 
             // aaa.part1.rar, aaa.part2.rar, bbb.part1.rar
             // or abc.rar, single rar
@@ -40,7 +40,7 @@ namespace SmartTaskLib
                 var unpackTask = new UnpackTask(elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList());
                 bool bExists = unpackTask.CheckFilesExist();
                 if (bExists)
-                    output.Add(unpackTask);
+                    output[unpackTask.Hash]= unpackTask;
             }
             #endregion
 
@@ -54,7 +54,7 @@ namespace SmartTaskLib
                 var unpackTask = new UnpackTask(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
                 bool bExists = unpackTask.CheckFilesExist();
                 if (bExists)
-                    output.Add(unpackTask);
+                    output[unpackTask.Hash] = unpackTask;
             }
 
             #endregion
@@ -68,18 +68,17 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static List<UnpackTask> CreateTaskForFile(string filePath)
+        public static Dictionary<string, UnpackTask> CreateTaskForFile(string filePath)
         {
-            var output = new List<UnpackTask>();
+            var output = new Dictionary<string, UnpackTask>();
             var unpackTask = new UnpackTask(new List<string>() { filePath});
             bool bExists = unpackTask.CheckFilesExist();
             if (bExists)
-                output.Add(unpackTask);                                
+                output[unpackTask.Hash] = unpackTask;                                
             else if(Directory.Exists(filePath))
                 return ScanDirectory(filePath);
             
             return output;
-
         }
 
         
