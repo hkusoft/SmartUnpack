@@ -52,48 +52,58 @@ namespace SmartUnpack
                         tasks = SmartTaskUtil.CreateTaskForFile(filePath);                        
                     }
 
-                    foreach (var task in tasks)
-                    {
-                        if (!AllTasks.ContainsKey(task.Key))
-                        {
-                            var item = task.Value;
-                            AllTasks[task.Key] = item;
+                    AddUnpackTasks(tasks);
 
-                            item.OnTaskFinished += OnTaskFinished;
-                            item.Unpack();
-                        }
-                    }
-
-                    RefreshDataSource();
                 }
 
                 
             }
         }
 
+        private void AddUnpackTasks(Dictionary<string, UnpackTask> tasks)
+        {
+
+            foreach (var task in tasks)
+            {
+                if (!AllTasks.ContainsKey(task.Key))
+                {
+                    var item = task.Value;
+                    AllTasks[task.Key] = item;
+
+                    item.OnTaskFinished += OnTaskFinished;
+                    item.Unpack();
+                }
+            }
+
+            RefreshDataSource();
+        }
+
         private void RefreshDataSource()
         {
-            TaskListView.ItemsSource = AllTasks.Values;
-            TaskListView.Items.Refresh();
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                TaskListView.ItemsSource = AllTasks.Values;
+                TaskListView.Items.Refresh();
+            }));            
         }
 
         private void OnTaskFinished(UnpackTask t, bool bSuccessful)
         {
-            if (AllTasks.ContainsKey(t.Hash))
-            {
-                AllTasks.Remove(t.Hash);
-                Application.Current.Dispatcher.Invoke(new Action(() =>
-                {
-                    RefreshDataSource();
-                }));
-                
-            }
-        }
+            if (!AllTasks.ContainsKey(t.Hash))
+                return;
+            
+            AllTasks.Remove(t.Hash);
 
-        private void Invoke(Func<object> p)
-        {
-            throw new NotImplementedException();
+            if (bSuccessful && !string.IsNullOrEmpty(t.SingleChildFolder2UnpackTo))
+            {
+                var tasks = SmartTaskUtil.ScanDirectory(t.SingleChildFolder2UnpackTo);
+                AddUnpackTasks(tasks);
+            }
+
+            RefreshDataSource();                
+            
         }
+        
 
         private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)
         {

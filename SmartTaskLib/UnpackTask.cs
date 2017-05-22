@@ -33,7 +33,20 @@ namespace SmartTaskLib
         long bytesUnpacked = 0;     
         
         //The active file under unpacking, its size is updated when a new entry beings unpacked
-        long currentEntrySize = 0;              
+        long currentEntrySize = 0;
+
+        /// <summary>
+        /// Used to further create a new unpack task when a single child folder is unpacked,
+        /// then we check if there is other rar files to be unpacked, used in OnTaskFinished() callback
+        /// </summary>
+        private string single_child_folder_to_unpack_to = null; 
+        public string SingleChildFolder2UnpackTo
+        {
+            get
+            {
+                return single_child_folder_to_unpack_to;
+            }
+        }
         
         #region Single File Unpack Progress
         //When unpacking a single file, the progress value
@@ -188,10 +201,16 @@ namespace SmartTaskLib
 
                 archive.CompressedBytesRead += Archive_CompressedBytesRead;
 
-                bool bShouldExtractHere = CheckSingleSubFolderExists(archive) || archive.Entries.Count() == 1;
+                bool bSingleChildFolderExists = CheckSingleSubFolderExists(archive);
+                if (bSingleChildFolderExists)
+                    single_child_folder_to_unpack_to = Path.Combine(targetFolder, single_child_folder_to_unpack_to);
+
+                bool bShouldExtractHere = bSingleChildFolderExists || archive.Entries.Count() == 1;
 
                 if (!bShouldExtractHere)
-                    targetFolder = Path.Combine(targetFolder, Title);
+                {
+                    targetFolder = Path.Combine(targetFolder, Title);                    
+                }
 
                 foreach (var entry in archive.Entries)
                 {
@@ -314,10 +333,16 @@ namespace SmartTaskLib
                 //For rar files, a directy is considered as an entry
                 foreach (RarArchiveEntry item in archive.Entries)
                 {
-                    //Console.WriteLine(item.Key);
+                    if (item.IsDirectory)
+                        single_child_folder_to_unpack_to = item.Key;
+
+
                     if (item.IsDirectory && !item.Key.Contains(@"\") && !item.Key.Contains(@"/"))
                         nDirectoryItems++;
                 }
+                if (nDirectoryItems != 1)
+                    single_child_folder_to_unpack_to = null;
+
                 return nDirectoryItems == 1;
             }
             else if (archive is SevenZipArchive)
