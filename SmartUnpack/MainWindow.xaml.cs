@@ -94,16 +94,37 @@ namespace SmartUnpack
             
             AllTasks.Remove(t.Hash);
 
-            if (bSuccessful && !string.IsNullOrEmpty(t.SingleChildFolder2UnpackTo))
+            if (bSuccessful && t.HasSoleChildFolder2Unpack)
             {
-                var tasks = SmartTaskUtil.ScanDirectory(t.SingleChildFolder2UnpackTo);
-                AddUnpackTasks(tasks);
+                //Move the sole child folder to its parent folder
+                var folder = new DirectoryInfo(t.SingleChildFolder2UnpackTo);
+                if(t.HasSoleChildFolder2Unpack)
+                {
+                    var tasks = SmartTaskUtil.ScanDirectory(t.SingleChildFolder2UnpackTo);
+                    AddUnpackTasks(tasks);
+                    RefreshDataSource();
+                    return;
+                }
             }
 
-            RefreshDataSource();                
-            
+            var targetExtractionFolder = new DirectoryInfo(t.TargetExtractionFolder);
+            var parentFolder = targetExtractionFolder.Parent;
+            //if the extraction target folder has one single child folder
+            if (parentFolder.GetDirectories().Count() == 1 && parentFolder.GetFiles().Count() == 0)
+            {                
+                var dir = parentFolder.Parent.FullName;
+                var move2Folder = System.IO.Path.Combine(dir, targetExtractionFolder.Name);
+                targetExtractionFolder.MoveTo(move2Folder);
+                parentFolder.Delete();
+            }
+            RefreshDataSource();
+
+
+
+
+
         }
-        
+
 
         private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)
         {

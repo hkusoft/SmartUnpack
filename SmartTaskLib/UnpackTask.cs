@@ -27,7 +27,9 @@ namespace SmartTaskLib
     public partial class UnpackTask : INotifyPropertyChanged
     {
         #region Fields and Properties
-        private List<string> FilePaths { get; set; }
+        private List<string> FilePaths { get; set; } //A.r01, A.r02
+
+        public string TargetExtractionFolder { get; set; } //Where to unpack these file?
 
         //Total byte unpacked so far
         long bytesUnpacked = 0;     
@@ -47,6 +49,15 @@ namespace SmartTaskLib
                 return single_child_folder_to_unpack_to;
             }
         }
+
+        public bool HasSoleChildFolder2Unpack
+        {
+            get
+            {
+                return !string.IsNullOrEmpty(SingleChildFolder2UnpackTo);
+            }
+        }
+
         
         #region Single File Unpack Progress
         //When unpacking a single file, the progress value
@@ -167,7 +178,7 @@ namespace SmartTaskLib
                 return;
 
 
-            var targetFolder = Path.GetDirectoryName(firstFile);
+            TargetExtractionFolder = Path.GetDirectoryName(firstFile);
             var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
 
             using (var archive = ArchiveFactory.Open(firstFile))
@@ -203,20 +214,20 @@ namespace SmartTaskLib
 
                 bool bSingleChildFolderExists = CheckSingleSubFolderExists(archive);
                 if (bSingleChildFolderExists)
-                    single_child_folder_to_unpack_to = Path.Combine(targetFolder, single_child_folder_to_unpack_to);
+                    single_child_folder_to_unpack_to = Path.Combine(TargetExtractionFolder, single_child_folder_to_unpack_to);
 
                 bool bShouldExtractHere = bSingleChildFolderExists || archive.Entries.Count() == 1;
 
                 if (!bShouldExtractHere)
                 {
-                    targetFolder = Path.Combine(targetFolder, Title);                    
+                    TargetExtractionFolder = Path.Combine(TargetExtractionFolder, Title);                    
                 }
 
                 foreach (var entry in archive.Entries)
                 {
                     if (!entry.IsDirectory)
                     {
-                        entry.WriteToDirectory(targetFolder, options);
+                        entry.WriteToDirectory(TargetExtractionFolder, options);
                     }
                 }
             }
