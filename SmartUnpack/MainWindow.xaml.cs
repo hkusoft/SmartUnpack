@@ -23,7 +23,7 @@ namespace SmartUnpack
     public partial class MainWindow : Window, IMainView
     {
         MainViewModel viewModel;
-        Dictionary<string, UnpackTask> AllTasks = new  Dictionary<string, UnpackTask>();
+        Dictionary<string, SharpCompressTask> AllTasks = new  Dictionary<string, SharpCompressTask>();
         public MainWindow()
         {
             InitializeComponent();
@@ -34,7 +34,7 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                Dictionary<string, UnpackTask> tasks = null;
+                Dictionary<string, SharpCompressTask> tasks = null;
 
                   // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -60,7 +60,7 @@ namespace SmartUnpack
             }
         }
 
-        private void AddUnpackTasks(Dictionary<string, UnpackTask> tasks)
+        private void AddUnpackTasks(Dictionary<string, SharpCompressTask> tasks)
         {
 
             foreach (var task in tasks)
@@ -87,27 +87,27 @@ namespace SmartUnpack
             }));            
         }
 
-        private void OnTaskFinished(UnpackTask t, bool bSuccessful)
+        private void OnTaskFinished(TaskBase task, bool bSuccessful)
         {
-            if (!AllTasks.ContainsKey(t.Hash))
+            if (!AllTasks.ContainsKey(task.Hash))
                 return;
             
-            AllTasks.Remove(t.Hash);
+            AllTasks.Remove(task.Hash);
 
-            if (bSuccessful && t.HasSoleChildFolder2Unpack)
+            if (bSuccessful && task.HasSoleChildFolder2Unpack)
             {
                 //Move the sole child folder to its parent folder
-                var folder = new DirectoryInfo(t.SingleChildFolder2UnpackTo);
-                if(t.HasSoleChildFolder2Unpack)
+                var folder = new DirectoryInfo(task.SingleChildFolder2UnpackTo);
+                if(task.HasSoleChildFolder2Unpack)
                 {
-                    var tasks = SmartTaskUtil.ScanDirectory(t.SingleChildFolder2UnpackTo);
+                    var tasks = SmartTaskUtil.ScanDirectory(task.SingleChildFolder2UnpackTo);
                     AddUnpackTasks(tasks);
                     RefreshDataSource();
                     return;
                 }
             }
 
-            var targetExtractionFolder = new DirectoryInfo(t.TargetExtractionFolder);
+            var targetExtractionFolder = new DirectoryInfo(task.TargetExtractionFolder);
             var parentFolder = targetExtractionFolder.Parent;
             //if the extraction target folder has one single child folder
             if (parentFolder.GetDirectories().Count() == 1 && parentFolder.GetFiles().Count() == 0)
@@ -131,7 +131,7 @@ namespace SmartUnpack
             if (e.AddedItems.Count > 0)
             {
                 viewModel.IsSomeTaskSelected = true;
-                viewModel.CurrentSelectedTask = e.AddedItems[0] as UnpackTask;
+                viewModel.CurrentSelectedTask = e.AddedItems[0] as SharpCompressTask;
             }
         }
     }

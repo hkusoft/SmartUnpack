@@ -93,7 +93,7 @@ namespace SmartTaskLib
         {
             AppendDirectory(Path.GetDirectoryName(path));
         }
-        catch (PathTooLongException Exx)
+        catch (PathTooLongException Ex2)
         {
             AppendDirectory(Path.GetDirectoryName(path));
         }

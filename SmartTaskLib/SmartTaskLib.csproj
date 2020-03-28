@@ -50,9 +50,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DotnetZipTask.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TaskBase.cs" />
     <Compile Include="Util.cs" />
-    <Compile Include="UnpackTask.cs" />
+    <Compile Include="SharpCompressTask.cs" />
     <Compile Include="SmartTaskUtil.cs" />
   </ItemGroup>
   <ItemGroup>

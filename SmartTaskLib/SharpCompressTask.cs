@@ -24,159 +24,26 @@ namespace SmartTaskLib
     ///     ...    
     ///     |__ABC.part0N.rar (FilePath N)
     /// </summary>
-    public partial class UnpackTask : INotifyPropertyChanged
+    public class SharpCompressTask : TaskBase
     {
-        #region Fields and Properties
-        private List<string> FilePaths { get; set; } //A.r01, A.r02
-
-        public string TargetExtractionFolder { get; set; } //Where to unpack these file?
-
-        //Total byte unpacked so far
-        long bytesUnpacked = 0;     
-        
-        //The active file under unpacking, its size is updated when a new entry beings unpacked
-        long currentEntrySize = 0;
-
-        /// <summary>
-        /// Used to further create a new unpack task when a single child folder is unpacked,
-        /// then we check if there is other rar files to be unpacked, used in OnTaskFinished() callback
-        /// </summary>
-        private string single_child_folder_to_unpack_to = null; 
-        public string SingleChildFolder2UnpackTo
-        {
-            get
-            {
-                return single_child_folder_to_unpack_to;
-            }
-        }
-
-        public bool HasSoleChildFolder2Unpack
-        {
-            get
-            {
-                return !string.IsNullOrEmpty(SingleChildFolder2UnpackTo);
-            }
-        }
-
-        
-        #region Single File Unpack Progress
-        //When unpacking a single file, the progress value
-        int single_file_unpack_progress = 0;    
-        /// <summary>
-        /// The progress when unpacking a single file, this is useful when
-        /// one of the entry file is very large
-        /// </summary>
-        public int SingleFileUnpackProgress
-        {
-            get { return single_file_unpack_progress; }
-            set {
-                single_file_unpack_progress = value;
-                OnPropertyChanged("SingleFileUnpackProgress");                                
-            }
-        }
-        #endregion
-
-        #region Overall File Unpack Progress
-
-        //When unpacking multiple volume files, the overall progress 
-        int overall_progress;                   
-        /// <summary>
-        /// The progress when unpacking a single file, this is useful when
-        /// one of the entry file is very large
-        /// </summary>
-        public int OverallProgress
-        {
-            get { return overall_progress; }
-            set
-            {
-                overall_progress = value;
-                OnPropertyChanged("OverallProgress");
-            }
-        }
-        #endregion
-
-        #region Current Progress Description
-
-        /// <summary>
-        /// The string to be displayed when unpacking a file
-        /// </summary>
-        private string currentProgressDescription;
-        public string CurrentProgressDescription
-        {
-            get
-            {
-                return currentProgressDescription;
-            }
-            set
-            {
-                currentProgressDescription = value;
-                OnPropertyChanged("CurrentProgressDescription");
-            }
-        }
-
-        #endregion
-
-
-        /// <summary>
-        /// Used to check if a task is already in a list of unpacking tasks
-        /// The hash is defined as the SHA1 of the concatenated string of all file paths
-        /// </summary>
-        public string Hash 
-        {
-            get
-            {
-                var str= FilePaths.Aggregate((a, b) => a + b); // Concatentate all paths of files involved
-                return StringUtil.Hash(str);
-            }
-        }
-        public string Title { get; set; } //Task Title
-
-        #endregion
-
-        #region Events exposed
-                
-        public delegate void TaskFinished(UnpackTask task, bool bSuccessful);
-        public event TaskFinished OnTaskFinished;
-        
-        #endregion
-
-        // Create the OnPropertyChanged method to raise the event
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
-               
-
-        
         /// <summary>
         /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
         /// This constructor extracts all SubTasks where each sub task has info about a file involved, the progress, the title etc.
         /// </summary>
         /// <param name="paths"> A list of files that are involved in this unpacking task</param>
-        public UnpackTask(List<string> paths)
+        public SharpCompressTask(List<string> paths)
         {
             var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
-            Title =  StringUtil.GetDotLeftString(title);
-            FilePaths = paths;       
+            Title = StringUtil.GetDotLeftString(title);
+            InputFilePaths = paths;
         }
+               
 
-       
-       
-        public void Unpack()
+        protected override void UnpackImpl()
         {
-            Task.Run(() =>
-            {
-                InternalUnpackImpl();                
-            });
-    }
-
-        private void InternalUnpackImpl()
-        {
-            var firstFile = FilePaths.FirstOrDefault(); //*.rar or *.r01
+            var firstFile = InputFilePaths.FirstOrDefault(); //*.rar or *.r01
             if (firstFile == null)
                 return;
-
 
             TargetExtractionFolder = Path.GetDirectoryName(firstFile);
             var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
@@ -190,7 +57,7 @@ namespace SmartTaskLib
                     {
                         var path = rar.Volumes.FirstOrDefault();
                         CurrentProgressDescription = "Please Unpack from the 1st volume";
-                        OnTaskFinished?.Invoke(this, false);
+                        OnUnpackFinished(false);
                         return;
                     }
                 }
@@ -202,10 +69,10 @@ namespace SmartTaskLib
                 if (!archive.IsComplete)
                 {
                     CurrentProgressDescription = "Incomplete files: some files are missing.";
-                    OnTaskFinished?.Invoke(this, false);
+                    OnUnpackFinished(false);
                     return;
                 }
-                bytesUnpacked = 0;                
+                bytesUnpacked = 0;
 
                 archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
                 archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
@@ -220,7 +87,7 @@ namespace SmartTaskLib
 
                 if (!bShouldExtractHere)
                 {
-                    TargetExtractionFolder = Path.Combine(TargetExtractionFolder, Title);                    
+                    TargetExtractionFolder = Path.Combine(TargetExtractionFolder, Title);
                 }
 
                 foreach (var entry in archive.Entries)
@@ -235,8 +102,9 @@ namespace SmartTaskLib
 
             if (SingleFileUnpackProgress == 100)
             {
-                CleanUp();                
-                OnTaskFinished?.Invoke(this, true);
+                CleanUp();
+                OnUnpackFinished(true);
+
             }
         }
 
@@ -274,8 +142,8 @@ namespace SmartTaskLib
         private void Archive_CompressedBytesRead(object sender, CompressedBytesReadEventArgs e)
         {
             IArchive archive = sender as IArchive;
-            
-            if(currentEntrySize !=0)
+
+            if (currentEntrySize != 0)
                 SingleFileUnpackProgress = Convert.ToInt32(e.CompressedBytesRead * 100 / currentEntrySize);
 
         }
@@ -285,18 +153,18 @@ namespace SmartTaskLib
         #region Utility Functions
 
         private void CleanUp()
-        {            
-            foreach (var item in FilePaths)
-                DeleteFile(item);            
+        {
+            foreach (var item in InputFilePaths)
+                DeleteFile(item);
         }
-        
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="bMove2RecyclerBin">By default, directly remove the file.</param>
         /// <returns></returns>
-        private bool DeleteFile(string filePath, bool bMove2RecyclerBin=false)
+        private bool DeleteFile(string filePath, bool bMove2RecyclerBin = false)
         {
             bool bSuccess = false;
             try
@@ -321,7 +189,7 @@ namespace SmartTaskLib
 
         internal bool CheckFilesExist()
         {
-            foreach (var path in FilePaths)
+            foreach (var path in InputFilePaths)
                 if (!File.Exists(path))
                     return false;
             return true;
@@ -374,7 +242,7 @@ namespace SmartTaskLib
             }
             else
                 return false;
-                     
+
         }
 
         #endregion

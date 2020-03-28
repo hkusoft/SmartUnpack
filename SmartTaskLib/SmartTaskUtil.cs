@@ -15,9 +15,9 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="inputFolderPath"></param>
         /// <returns></returns>
-        public static Dictionary<string, UnpackTask> ScanDirectory(string inputFolderPath)
+        public static Dictionary<string, SharpCompressTask> ScanDirectory(string inputFolderPath)
         {
-            var output = new Dictionary<string, UnpackTask>();
+            var output = new Dictionary<string, SharpCompressTask>();
 
             // aaa.part1.rar, aaa.part2.rar, bbb.part1.rar
             // or abc.rar, single rar
@@ -37,7 +37,7 @@ namespace SmartTaskLib
             foreach (string name in names)
             {
                 var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
-                var unpackTask = new UnpackTask(elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList());
+                var unpackTask = new SharpCompressTask(elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList());
                 bool bExists = unpackTask.CheckFilesExist();
                 if (bExists)
                     output[unpackTask.Hash]= unpackTask;
@@ -51,7 +51,7 @@ namespace SmartTaskLib
                                      select name;
             foreach (var entry in singleArchiveFiles)
             {
-                var unpackTask = new UnpackTask(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
+                var unpackTask = new SharpCompressTask(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
                 bool bExists = unpackTask.CheckFilesExist();
                 if (bExists)
                     output[unpackTask.Hash] = unpackTask;
@@ -68,10 +68,10 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static Dictionary<string, UnpackTask> CreateTaskForFile(string filePath)
+        public static Dictionary<string, SharpCompressTask> CreateTaskForFile(string filePath)
         {
-            var output = new Dictionary<string, UnpackTask>();
-            var unpackTask = new UnpackTask(new List<string>() { filePath});
+            var output = new Dictionary<string, SharpCompressTask>();
+            var unpackTask = new SharpCompressTask(new List<string>() { filePath});
             bool bExists = unpackTask.CheckFilesExist();
             if (bExists)
                 output[unpackTask.Hash] = unpackTask;                                
