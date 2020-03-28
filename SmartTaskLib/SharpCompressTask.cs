@@ -9,7 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.VisualBasic.FileIO;
+
 
 using SharpCompress.Common.Rar;
 using SharpCompress.Archives.SevenZip;
@@ -26,18 +26,9 @@ namespace SmartTaskLib
     /// </summary>
     public class SharpCompressTask : TaskBase
     {
-        /// <summary>
-        /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
-        /// This constructor extracts all SubTasks where each sub task has info about a file involved, the progress, the title etc.
-        /// </summary>
-        /// <param name="paths"> A list of files that are involved in this unpacking task</param>
-        public SharpCompressTask(List<string> paths)
+        public SharpCompressTask(List<string> paths) : base(paths)
         {
-            var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
-            Title = StringUtil.GetDotLeftString(title);
-            InputFilePaths = paths;
         }
-               
 
         protected override void UnpackImpl()
         {
@@ -45,7 +36,8 @@ namespace SmartTaskLib
             if (firstFile == null)
                 return;
 
-            TargetExtractionFolder = Path.GetDirectoryName(firstFile);
+            TargetExtractionFolder = Util.GetTargetPath(firstFile);
+                //Path.GetDirectoryName(firstFile)  ;
             var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
 
             using (var archive = ArchiveFactory.Open(firstFile))
@@ -98,31 +90,8 @@ namespace SmartTaskLib
                     }
                 }
             }
-
-
-            if (SingleFileUnpackProgress == 100)
-            {
-                CleanUp();
-                OnUnpackFinished(true);
-
-            }
         }
-
-        private bool UnpackIsoFile(string isoFileContainerFolder)
-        {
-            var isoFiles = Directory.GetFiles(isoFileContainerFolder, "*.iso");
-            foreach (var path in isoFiles)
-            {
-                //FilePathsToBeUnpacked.Add(path);
-                using (var archive = ArchiveFactory.Open(path))
-                {
-
-                }
-            }
-            return true;
-        }
-
-
+        
         #region Unpacking event handlers, progress updates
         private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
         {
@@ -149,51 +118,6 @@ namespace SmartTaskLib
         }
 
         #endregion
-
-        #region Utility Functions
-
-        private void CleanUp()
-        {
-            foreach (var item in InputFilePaths)
-                DeleteFile(item);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="filePath"></param>
-        /// <param name="bMove2RecyclerBin">By default, directly remove the file.</param>
-        /// <returns></returns>
-        private bool DeleteFile(string filePath, bool bMove2RecyclerBin = false)
-        {
-            bool bSuccess = false;
-            try
-            {
-                var name = Path.GetFileName(filePath);
-                CurrentProgressDescription = $"File clean up: Removing {name}";
-
-                if (bMove2RecyclerBin)
-                    FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                else
-                    File.Delete(filePath);
-
-                bSuccess = true;
-            }
-            catch (Exception ex)
-            {
-                CurrentProgressDescription = $"Exception: {ex.Message}";
-                return false;
-            }
-            return bSuccess;
-        }
-
-        internal bool CheckFilesExist()
-        {
-            foreach (var path in InputFilePaths)
-                if (!File.Exists(path))
-                    return false;
-            return true;
-        }
 
         /// <summary>
         /// Checks if a single child folder exists in the unpacked archive
@@ -244,7 +168,5 @@ namespace SmartTaskLib
                 return false;
 
         }
-
-        #endregion
     }
 }

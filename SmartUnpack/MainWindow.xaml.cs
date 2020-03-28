@@ -2,18 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace SmartUnpack
 {
@@ -44,23 +34,21 @@ namespace SmartUnpack
                     if (((int) e.KeyStates & 8) == 8)
                     {
                         var dir = System.IO.Path.GetDirectoryName(files[0]);
-                        tasks = SmartTaskUtil.ScanDirectory(dir);                        
+                        tasks = Util.ScanDirectory(dir);                        
                     }
                     else
                     {
                         var filePath = files[0];
-                        tasks = SmartTaskUtil.CreateTaskForFile(filePath);                        
+                        tasks = Util.CreateTaskForFile(filePath);                        
                     }
-
-                    AddUnpackTasks(tasks);
-
+                    Unpack(tasks);
                 }
 
                 
             }
         }
 
-        private void AddUnpackTasks(Dictionary<string, SharpCompressTask> tasks)
+        private void Unpack(Dictionary<string, SharpCompressTask> tasks)
         {
 
             foreach (var task in tasks)
@@ -100,29 +88,13 @@ namespace SmartUnpack
                 var folder = new DirectoryInfo(task.SingleChildFolder2UnpackTo);
                 if(task.HasSoleChildFolder2Unpack)
                 {
-                    var tasks = SmartTaskUtil.ScanDirectory(task.SingleChildFolder2UnpackTo);
-                    AddUnpackTasks(tasks);
+                    var tasks = Util.ScanDirectory(task.SingleChildFolder2UnpackTo);
+                    Unpack(tasks);
                     RefreshDataSource();
                     return;
                 }
-            }
-
-            var targetExtractionFolder = new DirectoryInfo(task.TargetExtractionFolder);
-            var parentFolder = targetExtractionFolder.Parent;
-            //if the extraction target folder has one single child folder
-            if (parentFolder.GetDirectories().Count() == 1 && parentFolder.GetFiles().Count() == 0)
-            {                
-                var dir = parentFolder.Parent.FullName;
-                var move2Folder = System.IO.Path.Combine(dir, targetExtractionFolder.Name);
-                targetExtractionFolder.MoveTo(move2Folder);
-                parentFolder.Delete();
-            }
+            }                        
             RefreshDataSource();
-
-
-
-
-
         }
 
 

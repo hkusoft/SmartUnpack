@@ -55,7 +55,6 @@
     <Compile Include="TaskBase.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="SharpCompressTask.cs" />
-    <Compile Include="SmartTaskUtil.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

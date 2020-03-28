@@ -14,7 +14,7 @@ namespace SmartTaskLib.Tests
         [TestMethod()]
         public void ScanDirectoryTest()
         {
-            var output = SmartTaskUtil.ScanDirectory(@"c:\Users\David\Downloads\Compressed\");
+            var output = Util.ScanDirectory(@"c:\Users\David\Downloads\Compressed\");
 
             Assert.IsTrue(output.Count >0);
         }

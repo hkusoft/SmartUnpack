@@ -7,10 +7,15 @@ using System.Security.Cryptography;
 using DiscUtils;
 using DiscUtils.Iso9660;
 using System.IO;
+using System.Text.RegularExpressions;
+using Microsoft.VisualBasic;
+using Microsoft.VisualBasic.FileIO;
+using FileSystem = Microsoft.VisualBasic.FileIO.FileSystem;
+using SearchOption = System.IO.SearchOption;
 
 namespace SmartTaskLib
 {
-    public class StringUtil
+    public class Util
     {
         public static string GetDotLeftString(string input)
         {
@@ -21,8 +26,27 @@ namespace SmartTaskLib
         public static string GetDotRightString(string input)
         {
             int i = input.LastIndexOf(".");
-            return i != -1 ? input.Substring(i+1) : input;
+            return i != -1 ? input.Substring(i + 1) : input;
         }
+
+
+        // C:\ab\cd\ef.rar --> C:\ab\cd\ef\
+        public static string GetTargetPath(string filepath)
+        {
+            string extension = Path.GetExtension(filepath);
+            string output = filepath.Substring(0, filepath.Length - extension.Length);
+            return output;
+        }
+
+
+        public static bool CheckFilesExist(IEnumerable<string> InputFilePaths)
+        {
+            foreach (var path in InputFilePaths)
+                if (!File.Exists(path))
+                    return false;
+            return true;
+        }
+
 
         /// <summary>
         /// This function computes the SHA1 hash value of a string
@@ -46,57 +70,190 @@ namespace SmartTaskLib
             }
         }
 
-        
 
-    public static void ExtractISO(string IsoFilePath, string ExtractionPath)
-    {
-        using (FileStream ISOStream = File.Open(IsoFilePath, FileMode.Open))
+
+        public static void ExtractISO(string IsoFilePath, string ExtractionPath)
         {
-            CDReader Reader = new CDReader(ISOStream, true, true);
-            ExtractDirectory(Reader.Root, ExtractionPath + Path.GetFileNameWithoutExtension(IsoFilePath) + "\\", "");
-            Reader.Dispose();
-        }
-    }
-    private static void ExtractDirectory(DiscDirectoryInfo Dinfo, string RootPath, string PathinISO)
-    {
-        if (!string.IsNullOrWhiteSpace(PathinISO))
-        {
-            PathinISO += "\\" + Dinfo.Name;
-        }
-        RootPath += "\\" + Dinfo.Name;
-        AppendDirectory(RootPath);
-        foreach (DiscDirectoryInfo dinfo in Dinfo.GetDirectories())
-        {
-            ExtractDirectory(dinfo, RootPath, PathinISO);
-        }
-        foreach (DiscFileInfo finfo in Dinfo.GetFiles())
-        {
-            using (Stream FileStr = finfo.OpenRead())
+            using (FileStream ISOStream = File.Open(IsoFilePath, FileMode.Open))
             {
-                using (FileStream Fs = File.Create(RootPath + "\\" + finfo.Name)) // Here you can Set the BufferSize Also e.g. File.Create(RootPath + "\\" + finfo.Name, 4 * 1024)
+                CDReader Reader = new CDReader(ISOStream, true, true);
+                ExtractDirectory(Reader.Root, ExtractionPath + Path.GetFileNameWithoutExtension(IsoFilePath) + "\\", "");
+                Reader.Dispose();
+            }
+        }
+        private static void ExtractDirectory(DiscDirectoryInfo Dinfo, string RootPath, string PathinISO)
+        {
+            if (!string.IsNullOrWhiteSpace(PathinISO))
+            {
+                PathinISO += "\\" + Dinfo.Name;
+            }
+            RootPath += "\\" + Dinfo.Name;
+            AppendDirectory(RootPath);
+            foreach (DiscDirectoryInfo dinfo in Dinfo.GetDirectories())
+            {
+                ExtractDirectory(dinfo, RootPath, PathinISO);
+            }
+            foreach (DiscFileInfo finfo in Dinfo.GetFiles())
+            {
+                using (Stream FileStr = finfo.OpenRead())
                 {
-                    FileStr.CopyTo(Fs, 4 * 1024); // Buffer Size is 4 * 1024 but you can modify it in your code as per your need
+                    using (FileStream Fs = File.Create(RootPath + "\\" + finfo.Name)) // Here you can Set the BufferSize Also e.g. File.Create(RootPath + "\\" + finfo.Name, 4 * 1024)
+                    {
+                        FileStr.CopyTo(Fs, 4 * 1024); // Buffer Size is 4 * 1024 but you can modify it in your code as per your need
+                    }
                 }
             }
         }
-    }
-    private static void AppendDirectory(string path)
-    {
-        try
+        private static void AppendDirectory(string path)
         {
-            if (!Directory.Exists(path))
+            try
             {
-                Directory.CreateDirectory(path);
+                if (!Directory.Exists(path))
+                {
+                    Directory.CreateDirectory(path);
+                }
+            }
+            catch (DirectoryNotFoundException Ex)
+            {
+                AppendDirectory(Path.GetDirectoryName(path));
+            }
+            catch (PathTooLongException Ex2)
+            {
+                AppendDirectory(Path.GetDirectoryName(path));
             }
         }
-        catch (DirectoryNotFoundException Ex)
+
+        /// <summary>
+        /// Scans all rar files in the input folderm and returns a list of unpack tasks
+        /// </summary>
+        /// <param name="inputFolderPath"></param>
+        /// <returns></returns>
+        public static Dictionary<string, SharpCompressTask> ScanDirectory(string inputFolderPath)
         {
-            AppendDirectory(Path.GetDirectoryName(path));
+            var output = new Dictionary<string, SharpCompressTask>();
+
+            // aaa.part1.rar, aaa.part2.rar, bbb.part1.rar
+            // or abc.rar, single rar
+            var rarFilePaths = System.IO.Directory.GetFiles(inputFolderPath, "*.rar");
+            // aaa.part1, aaa.part2, bbb.part1
+            var rarFileNames = rarFilePaths.Select(entry => Path.GetFileNameWithoutExtension(entry));
+
+            #region Multi-Volume Archives
+            // aaa, bbb
+            Regex re = new Regex(@"(.+)\.(part)(\d+)");
+            var names = (from name in rarFileNames
+                         let match = re.Match(name)
+                         where match.Success
+                         select match.Groups[1].Value).Distinct();
+
+            // aaa.part*.rar
+            foreach (string name in names)
+            {
+                var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
+                var unpackTask = new SharpCompressTask(elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList());
+                bool bExists = Util.CheckFilesExist(rarFilePaths);
+                if (bExists)
+                    output[unpackTask.Hash] = unpackTask;
+            }
+            #endregion
+
+            #region Single archive file
+            var singleArchiveFiles = from name in rarFileNames
+                                     let match = re.Match(name)
+                                     where !match.Success
+                                     select name;
+            foreach (var entry in singleArchiveFiles)
+            {
+                var unpackTask = new SharpCompressTask(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
+                bool bExists = Util.CheckFilesExist(rarFilePaths);
+                if (bExists)
+                    output[unpackTask.Hash] = unpackTask;
+            }
+
+            #endregion
+
+
+            return output;
         }
-        catch (PathTooLongException Ex2)
+
+        /// <summary>
+        /// Creates a Unpack task from a given path, the filePath might not be the *.part01, it might be *.part03 as well
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public static Dictionary<string, SharpCompressTask> CreateTaskForFile(string filePath)
         {
-            AppendDirectory(Path.GetDirectoryName(path));
+            var output = new Dictionary<string, SharpCompressTask>();
+            var unpackTask = new SharpCompressTask(new List<string>() { filePath });
+            bool bExists = Util.CheckFilesExist(unpackTask.InputFilePaths);
+            if (bExists)
+                output[unpackTask.Hash] = unpackTask;
+            else if (Directory.Exists(filePath))
+                return ScanDirectory(filePath);
+
+            return output;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="bMove2RecyclerBin">By default, directly remove the file.</param>
+        /// <returns></returns>
+        public static bool DeleteFile(string filePath, out string resultMessage, bool bMove2RecyclerBin = false)
+        {
+            bool bSuccess = false;
+            try
+            {
+                var name = Path.GetFileName(filePath);
+                resultMessage = $"File clean up: Removing {name}";
+
+                if (bMove2RecyclerBin)
+                    FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                else
+                    File.Delete(filePath);
+
+                bSuccess = true;
+            }
+            catch (Exception ex)
+            {
+                resultMessage = $"Exception: {ex.Message}";
+                return false;
+            }
+            return bSuccess;
+        }
+
+        public static string GetTempDirectoryName()
+        {
+            string tempDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            //Directory.CreateDirectory(tempDirectory);
+            return tempDirectory;
+        }
+
+        private static bool HasSingleChildFolder(string path)
+        {
+            return Directory.GetDirectories(path).Length == 1 && Directory.GetFiles(path).Length == 0;
+        }
+
+        private static bool HasSingleChildFolder(DirectoryInfo di)
+        {
+            return HasSingleChildFolder(di.FullName);
+        }
+
+        //path = C:\ab\cd , if cd has only one child folder ef, then:
+        //C:\ab\cd\ef\* --> C:\ab\cd\*
+        public static void MoveSingleFolderToParent(string path)
+        {
+            var temp = GetTempDirectoryName();
+            var di = new DirectoryInfo(path);
+            if(HasSingleChildFolder(di.Parent))
+            {
+                di.MoveTo(temp);
+                var newPath = new DirectoryInfo(path).Parent.FullName;
+                if(new DirectoryInfo(newPath).Exists)
+                    Directory.Delete(newPath);
+                Directory.Move(temp, newPath);
+            }
         }
     }
-}
 }

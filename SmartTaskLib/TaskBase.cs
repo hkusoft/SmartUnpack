@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.VisualBasic.FileIO;
 
 namespace SmartTaskLib
 {
@@ -11,7 +13,7 @@ namespace SmartTaskLib
     {
         #region Fields and Properties
 
-        protected List<string> InputFilePaths { get; set; } //A.r01, A.r02
+        public List<string> InputFilePaths { get; set; } //A.r01, A.r02
         public string TargetExtractionFolder { get; set; } //Where to unpack these file?
         //Total byte unpacked so far
         protected long bytesUnpacked = 0;
@@ -112,7 +114,7 @@ namespace SmartTaskLib
             get
             {
                 var str = InputFilePaths.Aggregate((a, b) => a + b); // Concatentate all paths of files involved
-                return StringUtil.Hash(str);
+                return Util.Hash(str);
             }
         }
         public string Title { get; set; } //Task Title
@@ -134,6 +136,21 @@ namespace SmartTaskLib
         public event TaskFinished OnTaskFinished;
         #endregion
 
+
+        /// <summary>
+        /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
+        /// This constructor extracts all SubTasks where each sub task has info about a file involved, the progress, the title etc.
+        ///
+        /// Only the first file name is used
+        /// </summary>
+        /// <param name="paths"> A list of files that are involved in this unpacking task</param>
+        public TaskBase(List<string> paths)
+        {
+            var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
+            Title = Util.GetDotLeftString(title);  //Used for UI binding
+            InputFilePaths = paths;
+        }
+        
         protected void OnUnpackFinished(bool bSuccessful)
         {
             OnTaskFinished?.Invoke(this, bSuccessful);
@@ -144,6 +161,11 @@ namespace SmartTaskLib
             Task.Run(() =>
             {
                 UnpackImpl();
+                if (SingleFileUnpackProgress == 100)
+                {
+                    OnUnpackFinished(true);
+                    CleanUp();
+                }
             });
         }
 
@@ -151,7 +173,18 @@ namespace SmartTaskLib
 
         }
 
-      
+        private void CleanUp()
+        {
+            String message = "";            
+            Util.MoveSingleFolderToParent(TargetExtractionFolder);
+
+            foreach (var item in InputFilePaths)
+                Util.DeleteFile(item, out message);
+
+        }
+
+
+
     }
 
 }

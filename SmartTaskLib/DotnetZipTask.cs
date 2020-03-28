@@ -7,8 +7,15 @@ using System.Threading.Tasks;
 
 namespace SmartTaskLib
 {
-    class DotnetZipTask : INotifyPropertyChanged
+    class DotnetZipTask : TaskBase
     {
-        public event PropertyChangedEventHandler PropertyChanged;
+        public DotnetZipTask(List<string> paths) : base(paths)
+        {
+        }
+
+        protected override void UnpackImpl()
+        {
+
+        }
     }
 }
