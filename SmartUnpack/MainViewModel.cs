@@ -26,7 +26,7 @@ namespace SmartUnpack
             }
         }
 
-        public SharpCompressTask CurrentSelectedTask { get; set; }
+        public TaskBase CurrentSelectedTask { get; set; }
 
         public MainViewModel(IMainView view) : base(view)
         {

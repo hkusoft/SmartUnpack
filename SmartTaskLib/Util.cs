@@ -2,21 +2,22 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Security.Cryptography;
 using DiscUtils;
 using DiscUtils.Iso9660;
 using System.IO;
 using System.Text.RegularExpressions;
-using Microsoft.VisualBasic;
 using Microsoft.VisualBasic.FileIO;
 using FileSystem = Microsoft.VisualBasic.FileIO.FileSystem;
-using SearchOption = System.IO.SearchOption;
 
 namespace SmartTaskLib
 {
     public class Util
     {
+        public static TaskBase CreateTask(List<String> inputPaths)
+        {
+            return new SharpCompressTask(inputPaths);
+        }
         public static string GetDotLeftString(string input)
         {
             int i = input.LastIndexOf(".");
@@ -72,28 +73,30 @@ namespace SmartTaskLib
 
 
 
-        public static void ExtractISO(string IsoFilePath, string ExtractionPath)
-        {
-            using (FileStream ISOStream = File.Open(IsoFilePath, FileMode.Open))
-            {
-                CDReader Reader = new CDReader(ISOStream, true, true);
-                ExtractDirectory(Reader.Root, ExtractionPath + Path.GetFileNameWithoutExtension(IsoFilePath) + "\\", "");
-                Reader.Dispose();
-            }
-        }
-        private static void ExtractDirectory(DiscDirectoryInfo Dinfo, string RootPath, string PathinISO)
+        // public static void ExtractISO(string IsoFilePath, string ExtractionPath)
+        // {
+        //     using (FileStream ISOStream = File.Open(IsoFilePath, FileMode.Open))
+        //     {
+        //         CDReader Reader = new CDReader(ISOStream, true, true);
+        //         ExtractDirectory(Reader.Root, ExtractionPath + Path.GetFileNameWithoutExtension(IsoFilePath) + "\\", "");
+        //         Reader.Dispose();
+        //     }
+        // }
+
+
+        private static void ExtractDirectory(DiscDirectoryInfo ddi, string RootPath, string PathinISO)
         {
             if (!string.IsNullOrWhiteSpace(PathinISO))
             {
-                PathinISO += "\\" + Dinfo.Name;
+                PathinISO += "\\" + ddi.Name;
             }
-            RootPath += "\\" + Dinfo.Name;
+            RootPath += "\\" + ddi.Name;
             AppendDirectory(RootPath);
-            foreach (DiscDirectoryInfo dinfo in Dinfo.GetDirectories())
+            foreach (DiscDirectoryInfo dinfo in ddi.GetDirectories())
             {
                 ExtractDirectory(dinfo, RootPath, PathinISO);
             }
-            foreach (DiscFileInfo finfo in Dinfo.GetFiles())
+            foreach (DiscFileInfo finfo in ddi.GetFiles())
             {
                 using (Stream FileStr = finfo.OpenRead())
                 {
@@ -128,9 +131,9 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="inputFolderPath"></param>
         /// <returns></returns>
-        public static Dictionary<string, SharpCompressTask> ScanDirectory(string inputFolderPath)
+        public static Dictionary<string, TaskBase> ScanDirectory(string inputFolderPath)
         {
-            var output = new Dictionary<string, SharpCompressTask>();
+            var output = new Dictionary<string, TaskBase>();
 
             // aaa.part1.rar, aaa.part2.rar, bbb.part1.rar
             // or abc.rar, single rar
@@ -150,7 +153,8 @@ namespace SmartTaskLib
             foreach (string name in names)
             {
                 var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
-                var unpackTask = new SharpCompressTask(elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList());
+                var paths = elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList();
+                var unpackTask = CreateTask(paths);
                 bool bExists = Util.CheckFilesExist(rarFilePaths);
                 if (bExists)
                     output[unpackTask.Hash] = unpackTask;
@@ -164,7 +168,7 @@ namespace SmartTaskLib
                                      select name;
             foreach (var entry in singleArchiveFiles)
             {
-                var unpackTask = new SharpCompressTask(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
+                var unpackTask = new TaskBase(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
                 bool bExists = Util.CheckFilesExist(rarFilePaths);
                 if (bExists)
                     output[unpackTask.Hash] = unpackTask;
@@ -181,10 +185,10 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static Dictionary<string, SharpCompressTask> CreateTaskForFile(string filePath)
+        public static Dictionary<string, TaskBase> CreateTaskForFile(string filePath)
         {
-            var output = new Dictionary<string, SharpCompressTask>();
-            var unpackTask = new SharpCompressTask(new List<string>() { filePath });
+            var output = new Dictionary<string, TaskBase>();
+            var unpackTask = CreateTask(new List<string>() { filePath });
             bool bExists = Util.CheckFilesExist(unpackTask.InputFilePaths);
             if (bExists)
                 output[unpackTask.Hash] = unpackTask;

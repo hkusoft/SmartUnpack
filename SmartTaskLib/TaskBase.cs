@@ -21,7 +21,7 @@ namespace SmartTaskLib
         protected long currentEntrySize = 0;
 
         /// <summary>
-        /// Used to further create a new unpack task when a single child folder is unpacked,
+        /// Used to further create a new unpack sharpCompressTask when a single child folder is unpacked,
         /// then we check if there is other rar files to be unpacked, used in OnTaskFinished() callback
         /// </summary>
         protected string single_child_folder_to_unpack_to = null;
@@ -106,7 +106,7 @@ namespace SmartTaskLib
 
 
         /// <summary>
-        /// Used to check if a task is already in a list of unpacking tasks
+        /// Used to check if a sharpCompressTask is already in a list of unpacking tasks
         /// The hash is defined as the SHA1 of the concatenated string of all file paths
         /// </summary>
         public string Hash
@@ -139,11 +139,11 @@ namespace SmartTaskLib
 
         /// <summary>
         /// Constructor: Given a list of files (*.part1.rar, *.part2.rar...)
-        /// This constructor extracts all SubTasks where each sub task has info about a file involved, the progress, the title etc.
+        /// This constructor extracts all SubTasks where each sub sharpCompressTask has info about a file involved, the progress, the title etc.
         ///
         /// Only the first file name is used
         /// </summary>
-        /// <param name="paths"> A list of files that are involved in this unpacking task</param>
+        /// <param name="paths"> A list of files that are involved in this unpacking sharpCompressTask</param>
         public TaskBase(List<string> paths)
         {
             var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
@@ -180,7 +180,6 @@ namespace SmartTaskLib
 
             foreach (var item in InputFilePaths)
                 Util.DeleteFile(item, out message);
-
         }
 
 

@@ -13,7 +13,7 @@ namespace SmartUnpack
     public partial class MainWindow : Window, IMainView
     {
         MainViewModel viewModel;
-        Dictionary<string, SharpCompressTask> AllTasks = new  Dictionary<string, SharpCompressTask>();
+        Dictionary<string, TaskBase> AllTasks = new  Dictionary<string, TaskBase>();
         public MainWindow()
         {
             InitializeComponent();
@@ -24,7 +24,7 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                Dictionary<string, SharpCompressTask> tasks = null;
+                Dictionary<string, TaskBase> tasks = null;
 
                   // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -48,7 +48,7 @@ namespace SmartUnpack
             }
         }
 
-        private void Unpack(Dictionary<string, SharpCompressTask> tasks)
+        private void Unpack(Dictionary<string, TaskBase> tasks)
         {
 
             foreach (var task in tasks)
@@ -75,20 +75,20 @@ namespace SmartUnpack
             }));            
         }
 
-        private void OnTaskFinished(TaskBase task, bool bSuccessful)
+        private void OnTaskFinished(TaskBase sharpCompressTask, bool bSuccessful)
         {
-            if (!AllTasks.ContainsKey(task.Hash))
+            if (!AllTasks.ContainsKey(sharpCompressTask.Hash))
                 return;
             
-            AllTasks.Remove(task.Hash);
+            AllTasks.Remove(sharpCompressTask.Hash);
 
-            if (bSuccessful && task.HasSoleChildFolder2Unpack)
+            if (bSuccessful && sharpCompressTask.HasSoleChildFolder2Unpack)
             {
                 //Move the sole child folder to its parent folder
-                var folder = new DirectoryInfo(task.SingleChildFolder2UnpackTo);
-                if(task.HasSoleChildFolder2Unpack)
+                var folder = new DirectoryInfo(sharpCompressTask.SingleChildFolder2UnpackTo);
+                if(sharpCompressTask.HasSoleChildFolder2Unpack)
                 {
-                    var tasks = Util.ScanDirectory(task.SingleChildFolder2UnpackTo);
+                    var tasks = Util.ScanDirectory(sharpCompressTask.SingleChildFolder2UnpackTo);
                     Unpack(tasks);
                     RefreshDataSource();
                     return;
