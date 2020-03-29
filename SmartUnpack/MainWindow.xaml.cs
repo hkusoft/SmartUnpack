@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace SmartUnpack
 {
@@ -14,17 +15,29 @@ namespace SmartUnpack
     {
         MainViewModel viewModel;
         Dictionary<string, TaskBase> AllTasks = new  Dictionary<string, TaskBase>();
+
+        Button[] PasswordButtons;
         public MainWindow()
         {
             InitializeComponent();
             viewModel = new MainViewModel(this);
+
+            
+            PasswordButtons = new[] {B1, B2, B3, B4, B5, B6};
+            var passwords = Properties.Settings.Default.ArchivePasswords;
+            for (int i = 0; i < passwords.Count; i++)
+            {
+                if (i < 6)
+                    PasswordButtons[i].Visibility = Visibility.Visible;
+            }
         }
 
-        private void TaskListView_Drop(object sender, DragEventArgs e)
+        private void OnFileDrop(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 Dictionary<string, TaskBase> tasks = null;
+                int passwordIndex = Array.IndexOf(PasswordButtons, sender);
 
                   // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -34,12 +47,12 @@ namespace SmartUnpack
                     if (((int) e.KeyStates & 8) == 8)
                     {
                         var dir = System.IO.Path.GetDirectoryName(files[0]);
-                        tasks = Util.ScanDirectory(dir);                        
+                        tasks = Util.ScanDirectory(dir, passwordIndex);                        
                     }
                     else
                     {
                         var filePath = files[0];
-                        tasks = Util.CreateTaskForFile(filePath);                        
+                        tasks = Util.CreateTaskForFile(filePath, passwordIndex);                        
                     }
                     Unpack(tasks);
                 }
@@ -75,20 +88,20 @@ namespace SmartUnpack
             }));            
         }
 
-        private void OnTaskFinished(TaskBase sharpCompressTask, bool bSuccessful)
+        private void OnTaskFinished(TaskBase task, bool bSuccessful)
         {
-            if (!AllTasks.ContainsKey(sharpCompressTask.Hash))
+            if (!AllTasks.ContainsKey(task.Hash))
                 return;
             
-            AllTasks.Remove(sharpCompressTask.Hash);
+            AllTasks.Remove(task.Hash);
 
-            if (bSuccessful && sharpCompressTask.HasSoleChildFolder2Unpack)
+            if (bSuccessful && task.HasSoleChildFolder2Unpack)
             {
                 //Move the sole child folder to its parent folder
-                var folder = new DirectoryInfo(sharpCompressTask.SingleChildFolder2UnpackTo);
-                if(sharpCompressTask.HasSoleChildFolder2Unpack)
+                var folder = new DirectoryInfo(task.SingleChildFolder2UnpackTo);
+                if(task.HasSoleChildFolder2Unpack)
                 {
-                    var tasks = Util.ScanDirectory(sharpCompressTask.SingleChildFolder2UnpackTo);
+                    var tasks = Util.ScanDirectory(task.SingleChildFolder2UnpackTo, task.PasswordIndex);
                     Unpack(tasks);
                     RefreshDataSource();
                     return;

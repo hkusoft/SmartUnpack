@@ -23,28 +23,47 @@
 
         <ToolBarTray DockPanel.Dock="Top" Height="54">
             <ToolBar>
-                <Button ToolTip="Unpack Selected" Command="{Binding UnpackSelectedCommand}" IsEnabled="{Binding IsSomeTaskSelected}">                    
-                        <Image Source="Images/Unpack.png"  Width="48" Height="48"/>
+                <Button ToolTip="Unpack Selected" Command="{Binding UnpackSelectedCommand}" IsEnabled="{Binding IsSomeTaskSelected}">
+                    <Image Source="Images/Unpack.png"  Width="48" Height="48"/>
                 </Button>
                 <Button ToolTip="Unpack All">
                     <Image Source="Images/UnpackAll.png"  Width="48" Height="48"/>
                 </Button>
             </ToolBar>
             <ToolBar>
+                <Button ToolTip="Use 1st password" Name="B1" AllowDrop="True" Drop="OnFileDrop" Visibility="Collapsed">
+                    <Image Source="Images/1.png"  Width="48" Height="48" />
+                </Button>
+                <Button ToolTip="Use 2nd password" Name="B2" AllowDrop="True"  Drop="OnFileDrop"  Visibility="Collapsed">
+                    <Image Source="Images/2.png"  Width="48" Height="48"/>
+                </Button>
+                <Button ToolTip="Use 3rd password" Name="B3" AllowDrop="True"  Drop="OnFileDrop" Visibility="Collapsed">
+                    <Image Source="Images/3.png"  Width="48" Height="48"/>
+                </Button>
+                <Button ToolTip="Use 4th password" Name="B4" AllowDrop="True"  Drop="OnFileDrop" Visibility="Collapsed">
+                    <Image Source="Images/4.png"  Width="48" Height="48"/>
+                </Button>
+                <Button ToolTip="Use 5th password" Name="B5" AllowDrop="True"  Drop="OnFileDrop" Visibility="Collapsed">
+                    <Image Source="Images/5.png"  Width="48" Height="48"/>
+                </Button>
+                <Button ToolTip="Use 6th password" Name="B6" AllowDrop="True" Drop="OnFileDrop"  Visibility="Collapsed">
+                    <Image Source="Images/6.png"  Width="48" Height="48"/>
+                </Button>
+            </ToolBar>
+            <ToolBar>
                 <Button ToolTip="Settings">
                     <Image Source="Images/Gear.png"  Width="48" Height="48"/>
                 </Button>
-
             </ToolBar>
         </ToolBarTray>
 
         <DataGrid x:Name="TaskListView" AutoGenerateColumns="False"  Grid.Row="1"
-                  Drop="TaskListView_Drop" AllowDrop="True" IsReadOnly="True"
+                  Drop="OnFileDrop" AllowDrop="True" IsReadOnly="True"
                   VerticalAlignment="Stretch"  HorizontalAlignment="Stretch"                
                   SelectionChanged="OnListViewSelectionChanged">
 
             <DataGrid.Columns>
-                
+
                 <DataGridTemplateColumn Header="Unpack Tasks" MinWidth="150">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -53,7 +72,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                
+
                 <DataGridTemplateColumn Header="Sub Tasks" MinWidth="300">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -67,6 +86,6 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
-        </DataGrid> 
+        </DataGrid>
     </Grid>
 </Window>

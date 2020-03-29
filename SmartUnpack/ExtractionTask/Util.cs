@@ -8,15 +8,17 @@ using DiscUtils.Iso9660;
 using System.IO;
 using System.Text.RegularExpressions;
 using Microsoft.VisualBasic.FileIO;
+using SmartUnpack.ExtractionTask;
 using FileSystem = Microsoft.VisualBasic.FileIO.FileSystem;
 
 namespace SmartTaskLib
 {
     public class Util
     {
-        public static TaskBase CreateTask(List<String> inputPaths)
+        public static TaskBase CreateTask(List<string> inputPaths, int passwordIndex)
         {
-            return new SharpCompressTask(inputPaths);
+            //return new SharpCompressTask(inputPaths);
+            return new SevenZipTask(inputPaths, passwordIndex);
         }
         public static string GetDotLeftString(string input)
         {
@@ -131,7 +133,7 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="inputFolderPath"></param>
         /// <returns></returns>
-        public static Dictionary<string, TaskBase> ScanDirectory(string inputFolderPath)
+        public static Dictionary<string, TaskBase> ScanDirectory(string inputFolderPath, int passwordIndex)
         {
             var output = new Dictionary<string, TaskBase>();
 
@@ -154,7 +156,7 @@ namespace SmartTaskLib
             {
                 var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
                 var paths = elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList();
-                var unpackTask = CreateTask(paths);
+                var unpackTask = CreateTask(paths, passwordIndex);
                 bool bExists = Util.CheckFilesExist(rarFilePaths);
                 if (bExists)
                     output[unpackTask.Hash] = unpackTask;
@@ -168,7 +170,8 @@ namespace SmartTaskLib
                                      select name;
             foreach (var entry in singleArchiveFiles)
             {
-                var unpackTask = new TaskBase(new List<string>() { Path.Combine(inputFolderPath, entry) + ".rar" });
+                var paths = new List<string>() {Path.Combine(inputFolderPath, entry) + ".rar"};
+                var unpackTask = new TaskBase(paths, passwordIndex);
                 bool bExists = Util.CheckFilesExist(rarFilePaths);
                 if (bExists)
                     output[unpackTask.Hash] = unpackTask;
@@ -185,15 +188,15 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static Dictionary<string, TaskBase> CreateTaskForFile(string filePath)
+        public static Dictionary<string, TaskBase> CreateTaskForFile(string filePath, int passwordIndex)
         {
             var output = new Dictionary<string, TaskBase>();
-            var unpackTask = CreateTask(new List<string>() { filePath });
+            var unpackTask = CreateTask(new List<string>() { filePath }, passwordIndex);
             bool bExists = Util.CheckFilesExist(unpackTask.InputFilePaths);
             if (bExists)
                 output[unpackTask.Hash] = unpackTask;
             else if (Directory.Exists(filePath))
-                return ScanDirectory(filePath);
+                return ScanDirectory(filePath, passwordIndex);
 
             return output;
         }

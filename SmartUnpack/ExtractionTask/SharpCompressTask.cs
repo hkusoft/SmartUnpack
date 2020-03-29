@@ -26,7 +26,7 @@ namespace SmartTaskLib
     /// </summary>
     public class SharpCompressTask : TaskBase
     {
-        public SharpCompressTask(List<string> paths) : base(paths)
+        public SharpCompressTask(List<string> paths, int passwordIndex) : base(paths, passwordIndex)
         {
         }
 
@@ -36,8 +36,7 @@ namespace SmartTaskLib
             if (firstFile == null)
                 return;
 
-            TargetExtractionFolder = Util.GetTargetPath(firstFile);
-                //Path.GetDirectoryName(firstFile)  ;
+            //Path.GetDirectoryName(firstFile)  ;
             var options = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
 
             using (var archive = ArchiveFactory.Open(firstFile))
@@ -66,10 +65,9 @@ namespace SmartTaskLib
                 }
                 bytesUnpacked = 0;
 
-                archive.EntryExtractionBegin += Archive_EntryExtractionBegin;
-                archive.EntryExtractionEnd += Archive_EntryExtractionEnd;
-
-                archive.CompressedBytesRead += Archive_CompressedBytesRead;
+                archive.EntryExtractionBegin += OnEntryExtractionBegin;
+                archive.EntryExtractionEnd += OnEntryExtractionEnd;
+                archive.CompressedBytesRead += OnBytesRead;
 
                 bool bSingleChildFolderExists = CheckSingleSubFolderExists(archive);
                 if (bSingleChildFolderExists)
@@ -93,27 +91,27 @@ namespace SmartTaskLib
         }
         
         #region Unpacking event handlers, progress updates
-        private void Archive_EntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
+        private void OnEntryExtractionBegin(object sender, SharpCompress.Common.ArchiveExtractionEventArgs<IArchiveEntry> e)
         {
             var extractedFile = Path.GetFileName(e.Item.Key);
-            currentEntrySize = e.Item.Size;
+            currentEntrySize = (ulong) e.Item.Size;
             CurrentProgressDescription = $"--> Extracting {extractedFile}";
         }
 
-        private void Archive_EntryExtractionEnd(object sender, ArchiveExtractionEventArgs<IArchiveEntry> e)
+        private void OnEntryExtractionEnd(object sender, ArchiveExtractionEventArgs<IArchiveEntry> e)
         {
             IArchive archive = sender as IArchive;
             long totalSize = archive.TotalUncompressSize;
-            bytesUnpacked += e.Item.Size;
-            OverallProgress = Convert.ToInt32(bytesUnpacked * 100 / totalSize);
+            bytesUnpacked += (ulong) e.Item.Size;
+            OverallProgress = Convert.ToInt32(bytesUnpacked * 100 / (ulong) totalSize);
         }
 
-        private void Archive_CompressedBytesRead(object sender, CompressedBytesReadEventArgs e)
+        private void OnBytesRead(object sender, CompressedBytesReadEventArgs e)
         {
             IArchive archive = sender as IArchive;
 
             if (currentEntrySize != 0)
-                SingleFileUnpackProgress = Convert.ToInt32(e.CompressedBytesRead * 100 / currentEntrySize);
+                SingleFileUnpackProgress = Convert.ToInt32(e.CompressedBytesRead * 100 / (long) currentEntrySize);
 
         }
 

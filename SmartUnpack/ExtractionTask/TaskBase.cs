@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.VisualBasic.FileIO;
 
 namespace SmartTaskLib
 {
@@ -16,9 +14,11 @@ namespace SmartTaskLib
         public List<string> InputFilePaths { get; set; } //A.r01, A.r02
         public string TargetExtractionFolder { get; set; } //Where to unpack these file?
         //Total byte unpacked so far
-        protected long bytesUnpacked = 0;
+        protected ulong bytesUnpacked = 0;
         //The active file under unpacking, its size is updated when a new entry beings unpacked
-        protected long currentEntrySize = 0;
+        protected ulong currentEntrySize = 0;
+
+        public int PasswordIndex { get; set; }  //Properties.Settings.Default.ArchivePasswords[PasswordIndex];
 
         /// <summary>
         /// Used to further create a new unpack sharpCompressTask when a single child folder is unpacked,
@@ -144,11 +144,15 @@ namespace SmartTaskLib
         /// Only the first file name is used
         /// </summary>
         /// <param name="paths"> A list of files that are involved in this unpacking sharpCompressTask</param>
-        public TaskBase(List<string> paths)
+        public TaskBase(List<string> paths, int passwordIndex)
         {
             var title = Path.GetFileNameWithoutExtension(paths.First()); //*.part1 or *.part01
             Title = Util.GetDotLeftString(title);  //Used for UI binding
             InputFilePaths = paths;
+
+            var firstFile = InputFilePaths.FirstOrDefault(); //*.rar or *.r01
+            TargetExtractionFolder = Util.GetTargetPath(firstFile);
+            PasswordIndex = passwordIndex;
         }
         
         protected void OnUnpackFinished(bool bSuccessful)
