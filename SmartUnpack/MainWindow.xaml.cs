@@ -11,10 +11,9 @@ namespace SmartUnpack
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window, IMainView
+    public partial class MainWindow : Window 
     {
         MainViewModel viewModel;
-        Dictionary<string, TaskBase> AllTasks = new  Dictionary<string, TaskBase>();
 
         Button[] PasswordButtons;
         public MainWindow()
@@ -36,7 +35,7 @@ namespace SmartUnpack
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                Dictionary<string, TaskBase> tasks = null;
+                List<TaskBase> tasks = null;
                 int passwordIndex = Array.IndexOf(PasswordButtons, sender);
 
                   // Note that you can have more than one file.
@@ -44,15 +43,15 @@ namespace SmartUnpack
                 if(files.Length>0)
                 {
                     //Shift Key pressed: 4, Ctrl key: 8
-                    if (((int) e.KeyStates & 8) == 8)
-                    {
-                        var dir = System.IO.Path.GetDirectoryName(files[0]);
-                        tasks = Util.ScanDirectory(dir, passwordIndex);                        
-                    }
-                    else
+                    // if (((int) e.KeyStates & 8) == 8)
+                    // {
+                    //     var dir = System.IO.Path.GetDirectoryName(files[0]);
+                    //     tasks = Util.ScanDirectory(dir, passwordIndex);                        
+                    // }
+                    // else
                     {
                         var filePath = files[0];
-                        tasks = Util.CreateTaskForFile(filePath, passwordIndex);                        
+                        tasks = Util.CreateTaskForFile(filePath, passwordIndex);
                     }
                     Unpack(tasks);
                 }
@@ -61,54 +60,23 @@ namespace SmartUnpack
             }
         }
 
-        private void Unpack(Dictionary<string, TaskBase> tasks)
+        private void Unpack(List<TaskBase> tasks)
         {
-
-            foreach (var task in tasks)
-            {
-                if (!AllTasks.ContainsKey(task.Key))
-                {
-                    var item = task.Value;
-                    AllTasks[task.Key] = item;
-
-                    item.OnTaskFinished += OnTaskFinished;
-                    item.Unpack();
-                }
-            }
-
-            RefreshDataSource();
+            viewModel.TaskList = tasks;
+            viewModel.StartUnpack();
+            //RefreshDataSource();
         }
 
-        private void RefreshDataSource()
-        {
-            Application.Current.Dispatcher.Invoke(new Action(() =>
-            {
-                TaskListView.ItemsSource = AllTasks.Values;
-                TaskListView.Items.Refresh();
-            }));            
-        }
+        // private void RefreshDataSource()
+        // {
+        //     Application.Current.Dispatcher.Invoke(new Action(() =>
+        //     {
+        //         TaskListView.ItemsSource = AllTasks.Values;
+        //         TaskListView.Items.Refresh();
+        //     }));            
+        // }
 
-        private void OnTaskFinished(TaskBase task, bool bSuccessful)
-        {
-            if (!AllTasks.ContainsKey(task.Hash))
-                return;
-            
-            AllTasks.Remove(task.Hash);
-
-            if (bSuccessful && task.HasSoleChildFolder2Unpack)
-            {
-                //Move the sole child folder to its parent folder
-                var folder = new DirectoryInfo(task.SingleChildFolder2UnpackTo);
-                if(task.HasSoleChildFolder2Unpack)
-                {
-                    var tasks = Util.ScanDirectory(task.SingleChildFolder2UnpackTo, task.PasswordIndex);
-                    Unpack(tasks);
-                    RefreshDataSource();
-                    return;
-                }
-            }                        
-            RefreshDataSource();
-        }
+        
 
 
         private void OnListViewSelectionChanged(object sender, SelectionChangedEventArgs e)

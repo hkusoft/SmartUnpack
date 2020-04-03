@@ -6,7 +6,6 @@
         xmlns:local="clr-namespace:SmartUnpack"
         mc:Ignorable="d"
         Title="Smart Unpack" Height="480" Width="640" Icon="Images/Unpack.ico" Topmost="True">
-
     <Window.Resources>
         <DataTemplate x:Key="IconListViewItemDataTemplate">
             <Canvas Width="128" Height="16">
@@ -60,7 +59,7 @@
         <DataGrid x:Name="TaskListView" AutoGenerateColumns="False"  Grid.Row="1"
                   Drop="OnFileDrop" AllowDrop="True" IsReadOnly="True"
                   VerticalAlignment="Stretch"  HorizontalAlignment="Stretch"                
-                  SelectionChanged="OnListViewSelectionChanged">
+                  SelectionChanged="OnListViewSelectionChanged" ItemsSource ="{Binding Path=TaskList}">
 
             <DataGrid.Columns>
 

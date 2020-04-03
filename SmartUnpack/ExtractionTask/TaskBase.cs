@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SmartTaskLib
@@ -19,7 +20,7 @@ namespace SmartTaskLib
         protected ulong currentEntrySize = 0;
 
         public int PasswordIndex { get; set; }  //Properties.Settings.Default.ArchivePasswords[PasswordIndex];
-
+        
         /// <summary>
         /// Used to further create a new unpack sharpCompressTask when a single child folder is unpacked,
         /// then we check if there is other rar files to be unpacked, used in OnTaskFinished() callback
@@ -104,19 +105,7 @@ namespace SmartTaskLib
 
         #endregion
 
-
-        /// <summary>
-        /// Used to check if a sharpCompressTask is already in a list of unpacking tasks
-        /// The hash is defined as the SHA1 of the concatenated string of all file paths
-        /// </summary>
-        public string Hash
-        {
-            get
-            {
-                var str = InputFilePaths.Aggregate((a, b) => a + b); // Concatentate all paths of files involved
-                return Util.Hash(str);
-            }
-        }
+        
         public string Title { get; set; } //Task Title
 
         #endregion
@@ -162,28 +151,30 @@ namespace SmartTaskLib
 
         public void Unpack()
         {
-            Task.Run(() =>
-            {
-                UnpackImpl();
-                if (SingleFileUnpackProgress == 100)
-                {
-                    OnUnpackFinished(true);
-                    CleanUp();
-                }
-            });
+            UnpackImpl();
+            //Do not do this, since this will pop "The files are opened by ... process" error
+            //Task.Run(() => {  }); 
         }
 
         protected virtual void UnpackImpl() { 
-
+            //To be overriden by derived classes
         }
 
-        private void CleanUp()
+        protected void CleanUp()
         {
             String message = "";            
             Util.MoveSingleFolderToParent(TargetExtractionFolder);
 
             foreach (var item in InputFilePaths)
-                Util.DeleteFile(item, out message);
+            {
+                if (File.Exists(item))
+                {
+                    Util.DeleteFile(item, out message);
+                    CurrentProgressDescription = message;
+                }
+            }
+
+            CurrentProgressDescription = "Successfully clean up the files!";
         }
 
 

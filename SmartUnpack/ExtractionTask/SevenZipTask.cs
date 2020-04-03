@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
 using SevenZip;
 using SmartTaskLib;
 
@@ -22,33 +24,28 @@ namespace SmartUnpack.ExtractionTask
 
             try
             {
-                using (Stream stream = File.OpenRead(firstFile))
+
+                var path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                    Environment.Is64BitProcess ? "x64" : "x86", "7z.dll");
+                SevenZip.SevenZipBase.SetLibraryPath(path);
+
+                int index = PasswordIndex;
+                SevenZipExtractor extractor;
+                if (index == -1)
                 {
-                    var path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), Environment.Is64BitProcess ? "x64" : "x86", "7z.dll");
-                    SevenZip.SevenZipBase.SetLibraryPath(path);
-
-                    int index = PasswordIndex;
-                    SevenZipExtractor extractor;
-                    if (index == -1)
-                    {
-                        extractor = new SevenZipExtractor(firstFile);
-                    }
-                    else
-                    {
-                        var password = Properties.Settings.Default.ArchivePasswords[index];
-                        extractor = new SevenZipExtractor(firstFile, password);
-                    }
-
-                    //InputFilePaths.AddRange(extractor.ArchiveFileNames); // *.r01, *.r02, which will be deleted in clean up
-
-
-                    extractor.FileExtractionStarted += OnFileExtractionStarted;
-                    extractor.Extracting += OnExtracting;
-                    extractor.FileExtractionFinished += OnFileExtractionFinished;
-                    //extractor.ExtractionFinished += OnExtractionFinished;
-                    extractor.ExtractArchive(TargetExtractionFolder);
-
+                    extractor = new SevenZipExtractor(firstFile);
                 }
+                else
+                {
+                    var password = Properties.Settings.Default.ArchivePasswords[index];
+                    extractor = new SevenZipExtractor(firstFile, password);
+                }
+                
+                extractor.FileExtractionStarted += OnFileExtractionStarted;
+                extractor.Extracting += OnExtracting;
+                extractor.FileExtractionFinished += OnFileExtractionFinished;
+                extractor.ExtractionFinished += OnExtractionFinished;
+                extractor.BeginExtractArchive(TargetExtractionFolder);
             }
             catch (Exception ex)
             {
@@ -57,11 +54,28 @@ namespace SmartUnpack.ExtractionTask
 
         }
 
-        
+        private void OnExtractionFinished(object sender, EventArgs e)
+        {
+            SevenZipExtractor extractor = sender as SevenZipExtractor;
+            InputFilePaths.AddRange(extractor.VolumeFileNames); // *.r01, *.r02, which will be deleted in clean up
+
+            if (OverallProgress == 100)
+            {
+                SingleFileUnpackProgress = 0;
+                OverallProgress = 0;
+                CurrentProgressDescription = "Success!";
+                OnUnpackFinished(true);
+                CleanUp();
+            }
+                
+        }
+
+
         private void OnFileExtractionStarted(object sender, FileInfoEventArgs e)
         {
             var extractedFile = Path.GetFileName(e.FileInfo.FileName);
             CurrentProgressDescription = $"--> Extracting {extractedFile}";
+            Console.WriteLine(CurrentProgressDescription);
             SingleFileUnpackProgress = 0;
         }
 

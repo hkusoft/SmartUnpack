@@ -22,7 +22,7 @@ namespace SmartTaskLib
         }
         public static string GetDotLeftString(string input)
         {
-            int i = input.LastIndexOf(".");
+            int i = input.IndexOf(".");
             return i != -1 ? input.Substring(0, i) : input;
         }
 
@@ -34,11 +34,11 @@ namespace SmartTaskLib
 
 
         // C:\ab\cd\ef.rar --> C:\ab\cd\ef\
-        public static string GetTargetPath(string filepath)
+        public static string GetTargetPath(string filePath)
         {
-            string extension = Path.GetExtension(filepath);
-            string output = filepath.Substring(0, filepath.Length - extension.Length);
-            return output;
+            var name = GetDotLeftString(filePath);
+            var folder = Path.GetDirectoryName(filePath);
+            return Path.Combine(folder, name);
         }
 
 
@@ -48,29 +48,6 @@ namespace SmartTaskLib
                 if (!File.Exists(path))
                     return false;
             return true;
-        }
-
-
-        /// <summary>
-        /// This function computes the SHA1 hash value of a string
-        /// </summary>
-        /// <param name="input"></param>
-        /// <returns></returns>
-        public static string Hash(string input)
-        {
-            using (SHA1Managed sha1 = new SHA1Managed())
-            {
-                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
-                var sb = new StringBuilder(hash.Length * 2);
-
-                foreach (byte b in hash)
-                {
-                    // can be "x2" if you want lowercase
-                    sb.Append(b.ToString("X2"));
-                }
-
-                return sb.ToString();
-            }
         }
 
 
@@ -133,34 +110,35 @@ namespace SmartTaskLib
         /// </summary>
         /// <param name="inputFolderPath"></param>
         /// <returns></returns>
-        public static Dictionary<string, TaskBase> ScanDirectory(string inputFolderPath, int passwordIndex)
+        public static List<TaskBase> ScanDirectory(string inputFolderPath, int passwordIndex)
         {
-            var output = new Dictionary<string, TaskBase>();
+            var output = new List<TaskBase>();
 
             // aaa.part1.rar, aaa.part2.rar, bbb.part1.rar
             // or abc.rar, single rar
             var rarFilePaths = System.IO.Directory.GetFiles(inputFolderPath, "*.rar");
             // aaa.part1, aaa.part2, bbb.part1
             var rarFileNames = rarFilePaths.Select(entry => Path.GetFileNameWithoutExtension(entry));
+            Regex re = new Regex(@"(.+)\.(part)(\d+)");
+
 
             #region Multi-Volume Archives
-            // aaa, bbb
-            Regex re = new Regex(@"(.+)\.(part)(\d+)");
-            var names = (from name in rarFileNames
-                         let match = re.Match(name)
-                         where match.Success
-                         select match.Groups[1].Value).Distinct();
-
-            // aaa.part*.rar
-            foreach (string name in names)
-            {
-                var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
-                var paths = elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList();
-                var unpackTask = CreateTask(paths, passwordIndex);
-                bool bExists = Util.CheckFilesExist(rarFilePaths);
-                if (bExists)
-                    output[unpackTask.Hash] = unpackTask;
-            }
+            // // aaa, bbb
+            // var names = (from name in rarFileNames
+            //              let match = re.Match(name)
+            //              where match.Success
+            //              select match.Groups[1].Value).Distinct();
+            //
+            // // aaa.part*.rar
+            // foreach (string name in names)
+            // {
+            //     var elements = rarFileNames.Where(item => item.StartsWith(name + ".part"));
+            //     var paths = elements.Select(entry => Path.Combine(inputFolderPath, entry) + ".rar").ToList();
+            //     var unpackTask = CreateTask(paths, passwordIndex);
+            //     bool bExists = Util.CheckFilesExist(rarFilePaths);
+            //     if (bExists)
+            //         output[unpackTask.Hash] = unpackTask;
+            // }
             #endregion
 
             #region Single archive file
@@ -174,29 +152,31 @@ namespace SmartTaskLib
                 var unpackTask = new TaskBase(paths, passwordIndex);
                 bool bExists = Util.CheckFilesExist(rarFilePaths);
                 if (bExists)
-                    output[unpackTask.Hash] = unpackTask;
+                    output.Add(unpackTask);
             }
-
+            
             #endregion
 
 
             return output;
         }
 
+
         /// <summary>
         /// Creates a Unpack task from a given path, the filePath might not be the *.part01, it might be *.part03 as well
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static Dictionary<string, TaskBase> CreateTaskForFile(string filePath, int passwordIndex)
+        public static List<TaskBase> CreateTaskForFile(string filePath, int passwordIndex)
         {
-            var output = new Dictionary<string, TaskBase>();
+            var output = new List<TaskBase>();
             var unpackTask = CreateTask(new List<string>() { filePath }, passwordIndex);
             bool bExists = Util.CheckFilesExist(unpackTask.InputFilePaths);
             if (bExists)
-                output[unpackTask.Hash] = unpackTask;
-            else if (Directory.Exists(filePath))
-                return ScanDirectory(filePath, passwordIndex);
+                output.Add(unpackTask);
+
+            // else if (Directory.Exists(filePath))
+            //     return ScanDirectory(filePath, passwordIndex);
 
             return output;
         }
@@ -205,9 +185,9 @@ namespace SmartTaskLib
         /// 
         /// </summary>
         /// <param name="filePath"></param>
-        /// <param name="bMove2RecyclerBin">By default, directly remove the file.</param>
+        /// <param name="ToRecyclerBin">By default, directly remove the file.</param>
         /// <returns></returns>
-        public static bool DeleteFile(string filePath, out string resultMessage, bool bMove2RecyclerBin = false)
+        public static bool DeleteFile(string filePath, out string resultMessage, bool ToRecyclerBin = false)
         {
             bool bSuccess = false;
             try
@@ -215,7 +195,7 @@ namespace SmartTaskLib
                 var name = Path.GetFileName(filePath);
                 resultMessage = $"File clean up: Removing {name}";
 
-                if (bMove2RecyclerBin)
+                if (ToRecyclerBin)
                     FileSystem.DeleteFile(filePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                 else
                     File.Delete(filePath);
